@@ -1,13 +1,13 @@
 const User = require('../models/User');
 const RegisterPayment = require('../models/RegisterPayment');
+const Domain = require('../models/Domain');
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const crypto = require('crypto');
 const { crteate_crm_user } = require('../helpers/crmHelper');
-
-
+const { Parser } = require('json2csv');
 
 
 const login = async (req, res) => {
@@ -57,7 +57,7 @@ const login = async (req, res) => {
         // 4. Generate emailscale_token if not exists
         let token = user.emailscale_token;
         if (!token) {
-            token = jwt.sign({ id: user.id }, 'your_jwt_secret', { expiresIn: '7d' });
+            token = jwt.sign({ id: user.id }, 'your_jwt_secret', { expiresIn: '1d' });
             user.emailscale_token = token;
             await user.save();
         }
@@ -190,55 +190,6 @@ const getUsers = async (req, res) => {
 };
 
 
-const updateUser = async (req, res) => {
-    try {
-        const { id, fname, lname, status, email, password, amount } = req.body;
-
-        // Prepare update data
-        const data = {
-            name: `${fname} ${lname}`,
-            fname,
-            lname,
-            status,
-            email_tool: !!req.body.email_tool,        // true if checkbox exists
-            domains_tool: !!req.body.domains_tool,
-            warm_up_tool: !!req.body.warm_up_tool,
-            ghl_tool: !!req.body.ghl_tool,
-        };
-
-        // Hash password if provided
-        if (password) {
-            const hashedPassword = await bcrypt.hash(password, 10);
-            data.password = hashedPassword;
-        }
-
-        // Update user
-        await User.update(data, { where: { id } });
-
-        // Update payment (amount in cents)
-        if (amount !== undefined && email) {
-            const paymentAmount = amount * 100;
-            await RegisterPayment.update(
-                { amount: paymentAmount },
-                { where: { email } }
-            );
-        }
-
-        return res.status(200).json({
-            status: true,
-            message: 'User updated successfully'
-        });
-
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            status: false,
-            message: 'Something went wrong',
-            error: error.message
-        });
-    }
-};
-
 const addUser = async (req, res) => {
     try {
         const { fname, lname, email, password, company_name } = req.body;
@@ -312,10 +263,194 @@ const addUser = async (req, res) => {
         });
     }
 };
+
+const updateUser = async (req, res) => {
+    try {
+        const { id } = req.params; 
+        const {
+            fname,
+            lname,
+            status,
+            email_tool,
+            domains_tool,
+            warm_up_tool,
+            ghl_tool,
+            password,
+            email,
+            amount
+        } = req.body;
+
+        // Prepare user update data
+        const data = {
+            name: `${fname} ${lname}`,
+            fname,
+            lname,
+            status,
+            email_tool: !!email_tool,
+            domains_tool: !!domains_tool,
+            warm_up_tool: !!warm_up_tool,
+            ghl_tool: !!ghl_tool
+        };
+
+        // Hash password if provided
+        if (password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            data.password = hashedPassword;
+        }
+
+        // Update User
+        await User.update(data, { where: { id } });
+
+        // Update RegisterPayment
+        if (amount && email) {
+            const amountInCents = amount * 100;
+            await RegisterPayment.update(
+                { amount: amountInCents },
+                { where: { email } }
+            );
+        }
+
+        return res.json({
+            status: true,
+            message: 'User updated successfully',
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: false,
+            message: 'Something went wrong',
+            error: error.message
+        });
+    }
+};
+
+const updateStatus = async (req, res) => {
+    try {
+        const { id } = req.params;         // <-- get id from URL
+        const { status } = req.body;
+
+        // Validate status
+        if (![0, 1].includes(Number(status))) {
+            return res.status(400).json({
+                status: false,
+                message: 'Invalid status. Must be 0 or 1.'
+            });
+        }
+
+        // Check if user exists
+        const user = await User.findByPk(id);
+        if (!user) {
+            return res.status(404).json({
+                status: false,
+                message: 'User not found'
+            });
+        }
+
+        // Update status
+        await User.update({ status }, { where: { id } });
+
+        return res.json({
+            status: true,
+            message: 'User status updated successfully'
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: false,
+            message: 'Something went wrong',
+            error: error.message
+        });
+    }
+};
+
+const deleteUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Find the user
+        const user = await User.findByPk(id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Delete associated records
+        await RegisterPayment.destroy({ where: { email: user.email } });
+        await Domain.destroy({ where: { user_id: id } });
+
+        // Delete the user
+        await user.destroy();
+
+        // Return success response
+        return res.json({
+            success: true,
+            name: user.name
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: 'Something went wrong',
+            error: error.message
+        });
+    }
+};
+
+const exportCsv = async (req, res) => {
+  try {
+    // Fetch all users
+    const users = await User.findAll();
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({
+        status: false,
+        message: "No users found",
+      });
+    }
+
+    // Prepare CSV fields (header)
+    const fields = [
+      { label: 'User Name', value: 'name' },
+      { label: 'Email', value: 'email' },
+      { label: 'Company Name', value: row => row.company_name || 'N/A' },
+      { label: 'Status', value: row => row.status === 1 ? 'Active' : 'Blocked' },
+      { label: 'Main Domain', value: row => row.domain || 'No Domain' },
+      { label: 'Email Verification', value: row => row.email_tool ? 'Enabled' : 'Disabled' },
+      { label: 'Email Warmup', value: row => row.warm_up_tool ? 'Enabled' : 'Disabled' },
+      { label: 'Inbox Setup', value: row => row.domains_tool ? 'Enabled' : 'Disabled' },
+    ];
+
+    // Convert to CSV
+    const json2csv = new Parser({ fields });
+    const csv = json2csv.parse(users);
+
+    // Set headers for file download
+    res.header('Content-Type', 'text/csv');
+    res.attachment('users_data.csv');
+    res.send(csv);
+
+  } catch (error) {
+    console.error('CSV Export Error:', error);
+    res.status(500).json({
+      status: false,
+      message: "Something went wrong",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   login,
   register,
   getUsers,
   updateUser,
-  addUser
+  addUser,
+  updateStatus,
+  deleteUser,
+  exportCsv
 };
