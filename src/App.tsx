@@ -37,7 +37,7 @@ const App = () => (
           {/* <Route path="/" element={<Navigate to="/dashboard" replace />} /> */}
           <Route path="/" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard/inbox-ordering" element={<InboxOrdering />} />
+          <Route path="/dashboard/inbox-ordering" element={<InboxOrdering />} /> 
           <Route path="/dashboard/warmup" element={<EmailWarmup />} />
           <Route path="/dashboard/placement-test" element={<PlacementTest />} />
           <Route path="/dashboard/verification" element={<EmailVerification />} />
