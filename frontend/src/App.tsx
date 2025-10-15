@@ -14,6 +14,7 @@ import EmailVerification from "./pages/EmailVerification";
 import Integrations from "./pages/Integrations";
 import Support from "./pages/Support";
 import Settings from "./pages/Settings";
+
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
