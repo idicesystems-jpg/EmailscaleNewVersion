@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAllUsers, getUserById,login, register } = require('../controllers/userController');
+const {login, register } = require('../controllers/userController');
 const {
   getAllTransactions,
   getTransactionById,
@@ -10,8 +10,6 @@ const {
 } = require('../controllers/transactionController');
 
 // Routes
-router.get('/users', getAllUsers);
-router.get('/user/:id', getUserById);
 router.post('/login', login);
 router.post('/register', register);
 
