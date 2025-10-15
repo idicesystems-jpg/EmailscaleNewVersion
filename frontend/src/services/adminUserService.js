@@ -8,6 +8,26 @@ export const adminUserService = apiSlice.injectEndpoints({
       providesTags: ["Users"],
     }),
 
+    exportUsersCsv: builder.query({
+      query: () => ({
+        url: "export-csv",
+        method: "GET",
+        responseHandler: async (response) => {
+          // Get the raw blob
+          const blob = await response.blob();
+          // Create a temporary download link
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "users.csv";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        },
+      }),
+    }),
+
     // Create a new user
     createUser: builder.mutation({
       query: (userData) => ({
@@ -21,19 +41,28 @@ export const adminUserService = apiSlice.injectEndpoints({
     // Delete user
     deleteUser: builder.mutation({
       query: (userId) => ({
-        url: `users/delete/${userId}`,
+        url: `delete-user/${userId}`,
         method: "DELETE",
       }),
       invalidatesTags: ["Users"],
     }),
 
-     updateUser: builder.mutation({
+    updateUser: builder.mutation({
       query: ({ userId, ...userData }) => ({
         url: `update-user/${userId}`,
         method: "PUT", // or PUT if your backend expects that
         body: userData,
       }),
       invalidatesTags: ["Users"],
+    }),
+
+    updateUserStatus: builder.mutation({
+      query: ({ userId, status }) => ({
+        url: `update-status/${userId}`, // 👈 your backend route
+        method: "PUT", // or PATCH if your backend uses that
+        body: { status },
+      }),
+      invalidatesTags: ["Users"], // ✅ ensures user list refreshes after update
     }),
 
     // Toggle account lock
@@ -86,5 +115,7 @@ export const {
   useTogglePauseMutation,
   useChangePasswordMutation,
   useUpdateSubscriptionMutation,
-  useUpdateUserMutation
+  useUpdateUserMutation,
+  useUpdateUserStatusMutation,
+  useLazyExportUsersCsvQuery
 } = adminUserService;

@@ -58,7 +58,9 @@ import {
   useTogglePauseMutation,
   useChangePasswordMutation,
   useUpdateSubscriptionMutation,
-  useUpdateUserMutation
+  useUpdateUserMutation,
+  useUpdateUserStatusMutation,
+  useLazyExportUsersCsvQuery,
 } from "../../services/adminUserService";
 
 const AdminUsers = () => {
@@ -74,9 +76,8 @@ const AdminUsers = () => {
 
   const [editForm, setEditForm] = useState(false);
 
-
   //fetch users code
-   const { data, error, isLoading } = useFetchUsersQuery();
+  const { data, error, isLoading } = useFetchUsersQuery();
 
   const users = data?.users || [];
 
@@ -84,8 +85,7 @@ const AdminUsers = () => {
 
   //fetch users code
 
-
-  //add user code 
+  //add user code
   // Define type for errors
   interface FormErrors {
     fname?: string;
@@ -98,7 +98,7 @@ const AdminUsers = () => {
     status?: string;
     amount?: string;
     ghl_tool?: string;
-  // Remove duplicate and fix interface
+    // Remove duplicate and fix interface
   }
 
   const [formData, setFormData] = useState({
@@ -114,19 +114,27 @@ const AdminUsers = () => {
     warm_up_tool: false,
     ghl_tool: false,
     amount: 0,
-    status: ""
+    status: "",
   });
+
+  console.log("Form Data:", formData);
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [createUser, { isLoading: creating }] = useCreateUserMutation();
-
- 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
     }));
   };
 
@@ -183,71 +191,107 @@ const AdminUsers = () => {
         warm_up_tool: false,
         ghl_tool: false,
         amount: 0,
-        status: ""
+        status: "",
       });
     } catch (err: any) {
       toast.error(err.data?.message || "Error creating user");
     }
   };
 
-
   ///add user code
 
+  // Function to handle edit click and populate form with user data
+  const handleEditClick = (user: any) => {
+    setFormData({
+      fname: user.fname || "",
+      lname: user.lname || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      company_name: user.company_name || "",
+      password: "",
+      password_confirmation: "",
+      email_tool: user.email_tool || false,
+      domains_tool: user.domains_tool || false,
+      warm_up_tool: user.warm_up_tool || false,
+      ghl_tool: user.ghl_tool || false,
+      amount: user.amount || 0,
+      status: user.status || "",
+    });
+    setSelectedUser(user);
+    setEditForm(true);
+  };
 
-// Function to handle edit click and populate form with user data
-const handleEditClick = (user: any) => {
-  setFormData({
-    fname: user.fname || "",
-    lname: user.lname || "",
-    email: user.email || "",
-    phone: user.phone || "",
-    company_name: user.company_name || "",
-    password: "",
-    password_confirmation: "",
-    email_tool: user.email_tool || false,
-    domains_tool: user.domains_tool || false,
-    warm_up_tool: user.warm_up_tool || false,
-    ghl_tool: user.ghl_tool || false,
-    amount: user.amount || 0,
-    status: user.status || ""
-  });
-  setSelectedUser(user);
-  setEditForm(true);
-};
+  const [updateUser, { isLoading: updating }] = useUpdateUserMutation();
 
+  const handleUpdateUser = async () => {
+    try {
+      await updateUser({ userId: selectedUser.id, ...formData }).unwrap();
+      toast.success("User updated successfully!");
+      setEditForm(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update user");
+    }
+  };
 
-const [updateUser, { isLoading: updating }] = useUpdateUserMutation();
+  //update user code
 
-const handleUpdateUser = async () => {
-  try {
-    await updateUser({ userId: selectedUser.id, ...formData }).unwrap();
-    toast.success("User updated successfully!");
-    setEditForm(false);
-  } catch (error) {
-    console.error(error);
-    toast.error("Failed to update user");
-  }
-};
+  //update status code
+  const [updateUserStatus, { isLoading: isUpdating }] =
+    useUpdateUserStatusMutation();
+  const handleToggleUserStatusPause = async (userId, isPaused) => {
+    try {
+      // Toggle pause status
+      const newStatus = !isPaused;
 
-  //update user code 
+      await updateUserStatus({
+        userId,
+        status: newStatus, // 👈 backend expects 'status'
+      }).unwrap();
+
+      toast.success(
+        newStatus ? "User account paused successfully" : "User account resumed"
+      );
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      toast.error("Failed to update user status");
+    }
+  };
+
+  //update status code
+
+  //delete user code
+  const [deleteUser, { isLoading: deleting }] = useDeleteUserMutation();
+
+  const handleDeleteUser = async (userId) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+
+    try {
+      const result = await deleteUser(userId).unwrap();
+      toast.success("User deleted successfully");
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error("Error deleting user");
+    }
+  };
+  //delete user code
+
+  //export user code
+  const [triggerExportCsv] = useLazyExportUsersCsvQuery();
+  const handleExportCsv = async () => {
+    try {
+      await triggerExportCsv().unwrap();
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export CSV");
+    }
+  };
+  //export user code
 
   const handleViewAsUser = (userId: string, email: string) => {
     setImpersonation(userId, email);
     navigate("/dashboard");
     toast.success(`Now viewing as ${email}`);
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
-
-    const { error } = await supabase.auth.admin.deleteUser(userId);
-
-    if (error) {
-      toast.error("Error deleting user");
-      console.error(error);
-    } else {
-      toast.success("User deleted successfully");
-    }
   };
 
   const handleToggleLock = async (userId: string, currentlyLocked: boolean) => {
@@ -561,7 +605,7 @@ const handleUpdateUser = async () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Amount</Label>
+                    <Label htmlFor="amount">Amount</Label>
                     <Input
                       id="amount"
                       name="amount"
@@ -569,23 +613,22 @@ const handleUpdateUser = async () => {
                       value={formData.amount}
                       onChange={handleInputChange}
                     />
-                    {errors.amount && (
-                      <p className="text-red-500 text-sm">{errors.amount}</p>
-                    )}
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="status">Status</Label>
-                    <Input
+                    <select
                       id="status"
                       name="status"
                       value={formData.status}
-                      onChange={handleInputChange}
-                    />
+                      onChange={handleSelectChange}
+                      className="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="">Select Status</option>
+                      <option value="1">Active</option>
+                      <option value="0">Inactive</option>
+                    </select>
                     {errors.status && (
-                      <p className="text-red-500 text-sm">
-                        {errors.status}
-                      </p>
+                      <p className="text-red-500 text-sm">{errors.status}</p>
                     )}
                   </div>
 
@@ -724,6 +767,12 @@ const handleUpdateUser = async () => {
                 <CardDescription>View and manage user accounts</CardDescription>
               </div>
               <div className="relative w-72">
+                <Button onClick={handleExportCsv}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+              </div>
+              <div className="relative w-72">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name, email, or phone..."
@@ -793,16 +842,14 @@ const handleUpdateUser = async () => {
                       <TableCell>
                         <span
                           className={`px-2 py-1 rounded text-xs ${
-                            user.status
+                            user.status == "1"
                               ? "bg-red-500/20 text-red-500"
-                              : user.status === "active"
+                              : user.status == "1"
                               ? "bg-green-500/20 text-green-500"
                               : "bg-orange-500/20 text-orange-500"
                           }`}
                         >
-                          {user.account_locked
-                            ? "Locked"
-                            : user.subscription_status || "active"}
+                          {user.status == "1" ? "Active" : "Inactive"}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -864,20 +911,21 @@ const handleUpdateUser = async () => {
                             variant="ghost"
                             size="sm"
                             onClick={() =>
-                              handleTogglePause(user.id, user.account_paused)
+                              handleToggleUserStatusPause(user.id, user.status)
                             }
                             title={
-                              user.account_paused
-                                ? "Resume account"
-                                : "Pause account"
+                              user.status == "1"
+                                ? "Pause account"
+                                : "Resume account"
                             }
                           >
-                            {user.account_paused ? (
-                              <Play className="h-4 w-4 text-green-500" />
+                            {user.status == "1" ? (
+                              <Pause className="h-4 w-4 text-red-500" />
                             ) : (
-                              <Pause className="h-4 w-4" />
+                              <Play className="h-4 w-4 text-green-500" />
                             )}
                           </Button>
+
                           <Button
                             variant="ghost"
                             size="sm"
