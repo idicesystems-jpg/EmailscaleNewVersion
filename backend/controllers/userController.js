@@ -1,8 +1,12 @@
 const User = require('../models/User');
+const RegisterPayment = require('../models/RegisterPayment');
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
+const crypto = require('crypto');
+const { crteate_crm_user } = require('../helpers/crmHelper');
+
 
 
 
@@ -166,7 +170,152 @@ const register = async (req, res) => {
     }
 };
 
+
+const getUsers = async (req, res) => {
+    try {
+        // Select all users
+        const users = await User.findAll(); // SELECT * FROM users
+        return res.status(200).json({
+            status: true,
+            users
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: false,
+            message: 'Something went wrong',
+            error: error.message
+        });
+    }
+};
+
+
+const updateUser = async (req, res) => {
+    try {
+        const { id, fname, lname, status, email, password, amount } = req.body;
+
+        // Prepare update data
+        const data = {
+            name: `${fname} ${lname}`,
+            fname,
+            lname,
+            status,
+            email_tool: !!req.body.email_tool,        // true if checkbox exists
+            domains_tool: !!req.body.domains_tool,
+            warm_up_tool: !!req.body.warm_up_tool,
+            ghl_tool: !!req.body.ghl_tool,
+        };
+
+        // Hash password if provided
+        if (password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            data.password = hashedPassword;
+        }
+
+        // Update user
+        await User.update(data, { where: { id } });
+
+        // Update payment (amount in cents)
+        if (amount !== undefined && email) {
+            const paymentAmount = amount * 100;
+            await RegisterPayment.update(
+                { amount: paymentAmount },
+                { where: { email } }
+            );
+        }
+
+        return res.status(200).json({
+            status: true,
+            message: 'User updated successfully'
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: false,
+            message: 'Something went wrong',
+            error: error.message
+        });
+    }
+};
+
+const addUser = async (req, res) => {
+    try {
+        const { fname, lname, email, password, company_name } = req.body;
+
+        // 1️⃣ Validate request
+        if (!fname || !lname || !email || !password) {
+            return res.status(422).json({
+                status: false,
+                message: 'Validation error',
+                error: 'fname, lname, email, and password are required',
+            });
+        }
+
+        // Check unique email
+        const existingUser = await User.findOne({ where: { email } });
+        if (existingUser) {
+            return res.status(422).json({
+                status: false,
+                message: 'Validation error',
+                error: 'Email already exists',
+            });
+        }
+
+        // 2️⃣ Generate random paymentMethodId
+        const paymentMethodId = 'pm_' + crypto.randomBytes(10).toString('hex');
+
+        // 3️⃣ Create the user
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await User.create({
+            name: `${fname} ${lname}`,
+            fname,
+            lname,
+            email,
+            company_name: company_name || null,
+            password: hashedPassword,
+            status: 1,
+            payment_status: 1,
+            email_tool: !!req.body.email_tool,
+            domains_tool: !!req.body.domains_tool,
+            warm_up_tool: !!req.body.warm_up_tool,
+            email_verified_at: new Date() // set email_verified_at
+        });
+
+        // 4️⃣ Call CRM helper function
+        await crteate_crm_user(req.body);
+
+        // 5️⃣ Create related RegisterPayment record
+        await RegisterPayment.create({
+            name: `${fname} ${lname}`,
+            paymentMethodId,
+            amount: 0,
+            fname,
+            lname,
+            email,
+            payment_mode: 'manual'
+        });
+
+        // 6️⃣ Send response
+        return res.status(200).json({
+            status: true,
+            message: 'User added successfully',
+            user
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: false,
+            message: 'Something went wrong',
+            error: error.message
+        });
+    }
+};
 module.exports = {
   login,
-  register
+  register,
+  getUsers,
+  updateUser,
+  addUser
 };
