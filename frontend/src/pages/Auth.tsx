@@ -7,8 +7,12 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, Loader2 } from "lucide-react";
 import { useLoginUserMutation } from "../services/authService";
+import { useDispatch } from "react-redux";
+import { setCredentials } from "../services/authSlice";
 
 const Auth = () => {
+  const dispatch = useDispatch();
+ 
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -27,7 +31,21 @@ const Auth = () => {
     try {
       const response = await loginUser(formData).unwrap();
       console.log("Login Success:", response);
-      localStorage.setItem("token", response.token); // optional
+       if (response.status) {
+        // save token & user in redux
+        dispatch(
+          setCredentials({
+            user: response.user,
+            token: response.emailscale_token,
+          })
+        );
+       if (response.user.role_id == 1) {
+          navigate("/admin"); // admin dashboard
+        } else {
+          navigate("/dashboard"); // regular user dashboard
+        } // redirect after login
+      }
+       // optional
     } catch (err) {
       console.error("Login Failed:", err);
     }

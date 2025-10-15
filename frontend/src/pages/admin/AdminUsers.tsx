@@ -1,17 +1,64 @@
 import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Trash2, UserPlus, Lock, Unlock, Key, Pause, Play, CreditCard, Eye, Search } from "lucide-react";
+import {
+  Trash2,
+  UserPlus,
+  Lock,
+  Unlock,
+  Key,
+  Pause,
+  Play,
+  CreditCard,
+  Eye,
+  Search,
+} from "lucide-react";
 import { useImpersonation } from "@/hooks/useImpersonation";
 import { useNavigate } from "react-router-dom";
+
+import {
+  useFetchUsersQuery,
+  useCreateUserMutation,
+  useDeleteUserMutation,
+  useToggleLockMutation,
+  useTogglePauseMutation,
+  useChangePasswordMutation,
+  useUpdateSubscriptionMutation,
+} from "../../services/adminUserService";
 
 const AdminUsers = () => {
   const navigate = useNavigate();
@@ -24,12 +71,92 @@ const AdminUsers = () => {
   const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [newPassword, setNewPassword] = useState("");
+  // Define type for errors
+interface FormErrors {
+  fname?: string;
+  lname?: string;
+  email?: string;
+  phone?: string;
+  company_name?: string;
+  password?: string;
+  password_confirmation?: string;
+}
   const [formData, setFormData] = useState({
+    fname: "",
+    lname: "",
     email: "",
-    password: "",
-    full_name: "",
     phone: "",
+    company_name: "",
+    password: "",
+    password_confirmation: "",
+    email_tool: false,
+    domains_tool: false,
+    warm_up_tool: false,
   });
+
+  const [errors, setErrors] = useState<FormErrors>({});
+const [createUser, { isLoading: creating }] = useCreateUserMutation();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const validateForm = () => {
+    const newErrors: any = {};
+
+    if (!formData.fname.trim()) newErrors.fname = "First Name is required";
+    if (!formData.lname.trim()) newErrors.lname = "Last Name is required";
+
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid";
+
+    if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
+    else if (!/^\d{10}$/.test(formData.phone)) newErrors.phone = "Phone number must be 10 digits";
+
+    if (!formData.company_name.trim()) newErrors.company_name = "Company Name is required";
+
+    if (!formData.password) newErrors.password = "Password is required";
+    if (!formData.password_confirmation) newErrors.password_confirmation = "Confirm Password is required";
+    else if (formData.password !== formData.password_confirmation) newErrors.password_confirmation = "Passwords do not match";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleCreateUser = async () => {
+    if (!validateForm()) return;
+
+    try {
+      await createUser({
+        ...formData,
+        email_tool: formData.email_tool ? 1 : 0,
+        domains_tool: formData.domains_tool ? 1 : 0,
+        warm_up_tool: formData.warm_up_tool ? 1 : 0,
+      }).unwrap();
+
+      toast.success("User created successfully");
+      setDialogOpen(false);
+      setFormData({
+        fname: "",
+        lname: "",
+        email: "",
+        phone: "",
+        company_name: "",
+        password: "",
+        password_confirmation: "",
+        email_tool: false,
+        domains_tool: false,
+        warm_up_tool: false,
+      });
+      refetch();
+    } catch (err: any) {
+      toast.error(err.data?.message || "Error creating user");
+    }
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -38,9 +165,9 @@ const AdminUsers = () => {
   const fetchUsers = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
 
     if (error) {
       toast.error("Error fetching users");
@@ -51,36 +178,7 @@ const AdminUsers = () => {
     setLoading(false);
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const { data, error } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          full_name: formData.full_name,
-        },
-      },
-    });
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    if (data.user && formData.phone) {
-      await supabase
-        .from('profiles')
-        .update({ phone: formData.phone })
-        .eq('id', data.user.id);
-    }
-
-    toast.success("User created successfully");
-    setDialogOpen(false);
-    setFormData({ email: "", password: "", full_name: "", phone: "" });
-    fetchUsers();
-  };
+ 
 
   const handleViewAsUser = (userId: string, email: string) => {
     setImpersonation(userId, email);
@@ -104,28 +202,35 @@ const AdminUsers = () => {
 
   const handleToggleLock = async (userId: string, currentlyLocked: boolean) => {
     const { error } = await supabase
-      .from('profiles')
+      .from("profiles")
       .update({ account_locked: !currentlyLocked })
-      .eq('id', userId);
+      .eq("id", userId);
 
     if (error) {
       toast.error("Error updating account lock status");
     } else {
-      toast.success(`Account ${!currentlyLocked ? 'locked' : 'unlocked'} successfully`);
+      toast.success(
+        `Account ${!currentlyLocked ? "locked" : "unlocked"} successfully`
+      );
       fetchUsers();
     }
   };
 
-  const handleTogglePause = async (userId: string, currentlyPaused: boolean) => {
+  const handleTogglePause = async (
+    userId: string,
+    currentlyPaused: boolean
+  ) => {
     const { error } = await supabase
-      .from('profiles')
+      .from("profiles")
       .update({ account_paused: !currentlyPaused })
-      .eq('id', userId);
+      .eq("id", userId);
 
     if (error) {
       toast.error("Error updating account pause status");
     } else {
-      toast.success(`Account ${!currentlyPaused ? 'paused' : 'resumed'} successfully`);
+      toast.success(
+        `Account ${!currentlyPaused ? "paused" : "resumed"} successfully`
+      );
       fetchUsers();
     }
   };
@@ -152,12 +257,12 @@ const AdminUsers = () => {
     if (!selectedUser) return;
 
     const { error } = await supabase
-      .from('profiles')
-      .update({ 
+      .from("profiles")
+      .update({
         subscription_plan: plan,
-        subscription_status: 'active'
+        subscription_status: "active",
       })
-      .eq('id', selectedUser.id);
+      .eq("id", selectedUser.id);
 
     if (error) {
       toast.error("Error updating subscription");
@@ -169,7 +274,7 @@ const AdminUsers = () => {
     }
   };
 
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = users.filter((user) => {
     const query = searchQuery.toLowerCase();
     return (
       user.full_name?.toLowerCase().includes(query) ||
@@ -183,7 +288,9 @@ const AdminUsers = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">User Management</h1>
+            <h1 className="text-3xl font-bold text-foreground">
+              User Management
+            </h1>
             <p className="text-muted-foreground">Manage all system users</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -196,48 +303,73 @@ const AdminUsers = () => {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
-                <DialogDescription>Add a new user to the system</DialogDescription>
+                <DialogDescription>
+                  Add a new user to the system
+                </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCreateUser} className="space-y-4">
+               {/* Inputs without <form> */}
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                <div className="space-y-2">
+                  <Label htmlFor="fname">First Name</Label>
+                  <Input id="fname" name="fname" value={formData.fname} onChange={handleInputChange} />
+                  {errors.fname && <p className="text-red-500 text-sm">{errors.fname}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lname">Last Name</Label>
+                  <Input id="lname" name="lname" value={formData.lname} onChange={handleInputChange} />
+                  {errors.lname && <p className="text-red-500 text-sm">{errors.lname}</p>}
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                  />
+                  <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
+                  {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name</Label>
-                  <Input
-                    id="full_name"
-                    value={formData.full_name}
-                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  />
-                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  />
+                  <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} />
+                  {errors.phone && <p className="text-red-500 text-sm">{errors.phone}</p>}
                 </div>
-                <Button type="submit" className="w-full">Create User</Button>
-              </form>
+
+                <div className="space-y-2">
+                  <Label htmlFor="company_name">Company Name</Label>
+                  <Input id="company_name" name="company_name" value={formData.company_name} onChange={handleInputChange} />
+                  {errors.company_name && <p className="text-red-500 text-sm">{errors.company_name}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input id="password" name="password" type="password" value={formData.password} onChange={handleInputChange} />
+                  {errors.password && <p className="text-red-500 text-sm">{errors.password}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password_confirmation">Confirm Password</Label>
+                  <Input id="password_confirmation" name="password_confirmation" type="password" value={formData.password_confirmation} onChange={handleInputChange} />
+                  {errors.password_confirmation && <p className="text-red-500 text-sm">{errors.password_confirmation}</p>}
+                </div>
+
+                {/* Checkbox Access */}
+                <div className="space-y-2">
+                  <Label>Access Tools</Label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1">
+                      <input type="checkbox" name="email_tool" checked={formData.email_tool} onChange={handleInputChange} /> Email Tool
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <input type="checkbox" name="domains_tool" checked={formData.domains_tool} onChange={handleInputChange} /> Domains Tool
+                    </label>
+                    <label className="flex items-center gap-1">
+                      <input type="checkbox" name="warm_up_tool" checked={formData.warm_up_tool} onChange={handleInputChange} /> WarmUp Tool
+                    </label>
+                  </div>
+                </div>
+                <Button onClick={handleCreateUser} className="w-full" loading={creating}>
+                  Create User
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
@@ -248,36 +380,47 @@ const AdminUsers = () => {
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{users.length}</div>
+              <div className="text-2xl font-bold text-primary">
+                {users.length}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Active Users
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {users.filter(u => !u.account_locked && !u.account_paused).length}
+                {
+                  users.filter((u) => !u.account_locked && !u.account_paused)
+                    .length
+                }
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Locked Users</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Locked Users
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-500">
-                {users.filter(u => u.account_locked).length}
+                {users.filter((u) => u.account_locked).length}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Paused Users</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Paused Users
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-500">
-                {users.filter(u => u.account_paused).length}
+                {users.filter((u) => u.account_paused).length}
               </div>
             </CardContent>
           </Card>
@@ -308,7 +451,9 @@ const AdminUsers = () => {
               </div>
             ) : filteredUsers.length === 0 ? (
               <p className="text-center text-muted-foreground p-8">
-                {searchQuery ? "No users found matching your search" : "No users found"}
+                {searchQuery
+                  ? "No users found matching your search"
+                  : "No users found"}
               </p>
             ) : (
               <Table>
@@ -326,18 +471,27 @@ const AdminUsers = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.id} className={user.account_locked ? 'bg-destructive/5' : ''}>
-                      <TableCell className="font-medium">{user.full_name || "—"}</TableCell>
+                    <TableRow
+                      key={user.id}
+                      className={user.account_locked ? "bg-destructive/5" : ""}
+                    >
+                      <TableCell className="font-medium">
+                        {user.full_name || "—"}
+                      </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.phone || "—"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            user.subscription_plan === 'unlimited' ? 'bg-purple-500/20 text-purple-500' :
-                            user.subscription_plan === 'professional' ? 'bg-blue-500/20 text-blue-500' :
-                            'bg-green-500/20 text-green-500'
-                          }`}>
-                            {user.subscription_plan || 'starter'}
+                          <span
+                            className={`px-2 py-1 rounded text-xs ${
+                              user.subscription_plan === "unlimited"
+                                ? "bg-purple-500/20 text-purple-500"
+                                : user.subscription_plan === "professional"
+                                ? "bg-blue-500/20 text-blue-500"
+                                : "bg-green-500/20 text-green-500"
+                            }`}
+                          >
+                            {user.subscription_plan || "starter"}
                           </span>
                           {user.account_paused && (
                             <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-500">
@@ -347,37 +501,55 @@ const AdminUsers = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          user.account_locked ? 'bg-red-500/20 text-red-500' :
-                          user.subscription_status === 'active' ? 'bg-green-500/20 text-green-500' :
-                          'bg-orange-500/20 text-orange-500'
-                        }`}>
-                          {user.account_locked ? 'Locked' : user.subscription_status || 'active'}
+                        <span
+                          className={`px-2 py-1 rounded text-xs ${
+                            user.account_locked
+                              ? "bg-red-500/20 text-red-500"
+                              : user.subscription_status === "active"
+                              ? "bg-green-500/20 text-green-500"
+                              : "bg-orange-500/20 text-orange-500"
+                          }`}
+                        >
+                          {user.account_locked
+                            ? "Locked"
+                            : user.subscription_status || "active"}
                         </span>
                       </TableCell>
                       <TableCell>
                         <div className="text-xs">
                           {user.stripe_customer_id ? (
                             <>
-                              <div className="truncate max-w-[100px]" title={user.stripe_customer_id}>
+                              <div
+                                className="truncate max-w-[100px]"
+                                title={user.stripe_customer_id}
+                              >
                                 {user.stripe_customer_id}
                               </div>
                               {user.next_billing_date && (
                                 <div className="text-muted-foreground">
-                                  Next: {new Date(user.next_billing_date).toLocaleDateString()}
+                                  Next:{" "}
+                                  {new Date(
+                                    user.next_billing_date
+                                  ).toLocaleDateString()}
                                 </div>
                               )}
                             </>
-                          ) : '—'}
+                          ) : (
+                            "—"
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleViewAsUser(user.id, user.email)}
+                            onClick={() =>
+                              handleViewAsUser(user.id, user.email)
+                            }
                             title="View as User"
                           >
                             <Eye className="h-4 w-4" />
@@ -385,8 +557,14 @@ const AdminUsers = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleToggleLock(user.id, user.account_locked)}
-                            title={user.account_locked ? "Unlock account" : "Lock account"}
+                            onClick={() =>
+                              handleToggleLock(user.id, user.account_locked)
+                            }
+                            title={
+                              user.account_locked
+                                ? "Unlock account"
+                                : "Lock account"
+                            }
                           >
                             {user.account_locked ? (
                               <Unlock className="h-4 w-4 text-green-500" />
@@ -397,8 +575,14 @@ const AdminUsers = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleTogglePause(user.id, user.account_paused)}
-                            title={user.account_paused ? "Resume account" : "Pause account"}
+                            onClick={() =>
+                              handleTogglePause(user.id, user.account_paused)
+                            }
+                            title={
+                              user.account_paused
+                                ? "Resume account"
+                                : "Pause account"
+                            }
                           >
                             {user.account_paused ? (
                               <Play className="h-4 w-4 text-green-500" />
@@ -452,7 +636,8 @@ const AdminUsers = () => {
             <DialogHeader>
               <DialogTitle>Change User Password</DialogTitle>
               <DialogDescription>
-                Set a new password for {selectedUser?.full_name || selectedUser?.email}
+                Set a new password for{" "}
+                {selectedUser?.full_name || selectedUser?.email}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -474,47 +659,66 @@ const AdminUsers = () => {
         </Dialog>
 
         {/* Subscription Management Dialog */}
-        <Dialog open={subscriptionDialogOpen} onOpenChange={setSubscriptionDialogOpen}>
+        <Dialog
+          open={subscriptionDialogOpen}
+          onOpenChange={setSubscriptionDialogOpen}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Manage Subscription</DialogTitle>
               <DialogDescription>
-                Change subscription plan for {selectedUser?.full_name || selectedUser?.email}
+                Change subscription plan for{" "}
+                {selectedUser?.full_name || selectedUser?.email}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Current Plan: <span className="font-semibold">{selectedUser?.subscription_plan || 'starter'}</span></Label>
+                <Label>
+                  Current Plan:{" "}
+                  <span className="font-semibold">
+                    {selectedUser?.subscription_plan || "starter"}
+                  </span>
+                </Label>
               </div>
               <div className="grid gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleUpdateSubscription('starter')}
+                <Button
+                  variant="outline"
+                  onClick={() => handleUpdateSubscription("starter")}
                   className="justify-start h-auto py-4"
                 >
                   <div className="text-left">
                     <div className="font-semibold">Starter Plan - £69/mo</div>
-                    <div className="text-sm text-muted-foreground">30 inboxes</div>
+                    <div className="text-sm text-muted-foreground">
+                      30 inboxes
+                    </div>
                   </div>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleUpdateSubscription('professional')}
+                <Button
+                  variant="outline"
+                  onClick={() => handleUpdateSubscription("professional")}
                   className="justify-start h-auto py-4"
                 >
                   <div className="text-left">
-                    <div className="font-semibold">Professional Plan - £99/mo</div>
-                    <div className="text-sm text-muted-foreground">100 inboxes</div>
+                    <div className="font-semibold">
+                      Professional Plan - £99/mo
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      100 inboxes
+                    </div>
                   </div>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleUpdateSubscription('unlimited')}
+                <Button
+                  variant="outline"
+                  onClick={() => handleUpdateSubscription("unlimited")}
                   className="justify-start h-auto py-4"
                 >
                   <div className="text-left">
-                    <div className="font-semibold">Unlimited Plan - £299/mo</div>
-                    <div className="text-sm text-muted-foreground">Unlimited inboxes</div>
+                    <div className="font-semibold">
+                      Unlimited Plan - £299/mo
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Unlimited inboxes
+                    </div>
                   </div>
                 </Button>
               </div>

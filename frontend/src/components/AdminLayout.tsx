@@ -16,16 +16,23 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+import { useDispatch } from "react-redux";
+import { logout } from "../services/authSlice";
+
+
 interface AdminLayoutProps {
   children: ReactNode;
 }
 
 export const AdminLayout = ({ children }: AdminLayoutProps) => {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    //await supabase.auth.signOut();
+    // Clear auth state
+    dispatch(logout());
     navigate("/");
     toast.success("Logged out successfully");
   };
