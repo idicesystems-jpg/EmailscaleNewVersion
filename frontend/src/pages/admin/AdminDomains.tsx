@@ -43,7 +43,8 @@ import {
   useFetchDomainsQuery,
   useUpdateDomainStatusMutation,
   useDeleteDomainMutation,
-  useImportDomainsMutation
+  useImportDomainsMutation,
+  useLazyExportDomainsCsvQuery,
 } from "../../services/adminDomainService";
 import { useAllUsersQuery } from "../../services/adminUserService";
 import DomainTable from "../../components/DomainTable";
@@ -57,20 +58,26 @@ const AdminDomains = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState("");
+
   const { data: users } = useAllUsersQuery();
 
   //console.log("Users data:", users); // Debugging line
 
-
-  const { data, error, isLoading } = useFetchDomainsQuery();
+  const { data, error, isLoading } = useFetchDomainsQuery({
+    page,
+    limit,
+    search,
+  });
 
   const actualDomainsData = data ? data.data.domains : [];
 
   //update domain status
   const [updateDomainStatus] = useUpdateDomainStatusMutation();
 
-   const [deleteDomain] = useDeleteDomainMutation();
-
+  const [deleteDomain] = useDeleteDomainMutation();
 
   //add domain with user creation
   const [createUser, setCreateUser] = useState(false);
@@ -240,6 +247,33 @@ const AdminDomains = () => {
     }
   };
 
+  const [exportDomainsCsv, { isFetching }] = useLazyExportDomainsCsvQuery();
+  const [selectedIds, setSelectedIds] = useState([]);
+  console.log("selectedIds", selectedIds);
+  const handleExportDomainsCsv = async () => {
+    try {
+      // If selectedIds is empty, backend should export all
+      const payload =
+        selectedIds.length > 0 ? { selected_ids: selectedIds } : {};
+
+      const response = await exportDomainsCsv(payload).unwrap();
+
+      const blob = new Blob([response], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download =
+        selectedIds.length > 0
+          ? "selected_domains_export.csv"
+          : "all_domains_export.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("CSV Export failed:", error);
+      alert("Failed to export domains CSV.");
+    }
+  };
+
   const downloadCSVTemplate = () => {
     const template = `domain_name,user_email,registrar,purchase_date,expiry_date,status,notes
 example.com,user@example.com,GoDaddy,2024-01-01,2025-01-01,active,Sample domain
@@ -254,49 +288,47 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
     window.URL.revokeObjectURL(url);
   };
 
-
   const [importDomains] = useImportDomainsMutation();
- const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  
-  const file = event.target.files?.[0];
-  if (!file) return;
 
-  setUploading(true);
+  const handleCSVUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  try {
-    const text = await file.text();
-    const lines = text.split("\n").filter((line) => line.trim());
+    setUploading(true);
 
-    if (lines.length < 2) {
-      toast.error("CSV file is empty or invalid");
-      return;
-    }
-
-    // Optional: parse headers if needed for validation
-    const headers = lines[0].split(",").map((h) => h.trim());
-    const errors: string[] = [];
-
-    // Call RTK mutation directly with the file
     try {
-      await importDomains(file).unwrap(); // <- your RTK Query mutation
-      toast.success(`CSV imported successfully`);
-    } catch (mutationError) {
-      console.error("Import failed:", mutationError);
-      toast.error("Error importing CSV file");
-    }
-  } catch (error) {
-    console.error("CSV reading/parsing error:", error);
-    toast.error("Error reading CSV file");
-  } finally {
-    setUploading(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-};
+      const text = await file.text();
+      const lines = text.split("\n").filter((line) => line.trim());
 
+      if (lines.length < 2) {
+        toast.error("CSV file is empty or invalid");
+        return;
+      }
 
- 
+      // Optional: parse headers if needed for validation
+      const headers = lines[0].split(",").map((h) => h.trim());
+      const errors: string[] = [];
+
+      // Call RTK mutation directly with the file
+      try {
+        await importDomains(file).unwrap(); // <- your RTK Query mutation
+        toast.success(`CSV imported successfully`);
+      } catch (mutationError) {
+        console.error("Import failed:", mutationError);
+        toast.error("Error importing CSV file");
+      }
+    } catch (error) {
+      console.error("CSV reading/parsing error:", error);
+      toast.error("Error reading CSV file");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   // const getDaysUntilExpiry = (expiryDate: string) => {
   //   if (!expiryDate) return null;
@@ -356,9 +388,7 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-500">
-                10
-              </div>
+              <div className="text-2xl font-bold text-red-500">10</div>
             </CardContent>
           </Card>
           <Card className="border-orange-500">
@@ -369,9 +399,7 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-500">
-                20
-              </div>
+              <div className="text-2xl font-bold text-orange-500">20</div>
             </CardContent>
           </Card>
           <Card className="border-yellow-500">
@@ -382,9 +410,7 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-500">
-                30
-              </div>
+              <div className="text-2xl font-bold text-yellow-500">30</div>
             </CardContent>
           </Card>
         </div>
@@ -403,8 +429,11 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search domains, users, or registrar..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1); // Reset page when searching
+                    }}
                     className="pl-10"
                   />
                 </div>
@@ -673,13 +702,99 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                     </div>
                   </DialogContent>
                 </Dialog>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportDomainsCsv}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            
-              <DomainTable domainsData={actualDomainsData} updateDomainStatus={updateDomainStatus} deleteDomain={deleteDomain} />
-              
+            <DomainTable
+              domainsData={actualDomainsData}
+              updateDomainStatus={updateDomainStatus}
+              deleteDomain={deleteDomain}
+              exportDomainsCsv={exportDomainsCsv}
+              setSelectedIds={setSelectedIds}
+            />
+            {/* Pagination Controls */}
+            <div className="flex justify-between items-center mt-4 flex-wrap gap-2">
+              {/* Page size selector */}
+              <div>
+                <span className="mr-2">Rows per page:</span>
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(Number(e.target.value));
+                    setPage(1); // Reset page when limit changes
+                  }}
+                  className="border px-2 py-1 rounded"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+
+              {/* Pagination buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(1)}
+                  disabled={page === 1}
+                  className="px-2 py-1 border rounded disabled:opacity-50"
+                >
+                  {"<<"}
+                </button>
+                <button
+                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={page === 1}
+                  className="px-2 py-1 border rounded disabled:opacity-50"
+                >
+                  {"Prev"}
+                </button>
+
+                {/* Page numbers */}
+                {Array.from(
+                  { length: data?.totalPages || 1 },
+                  (_, i) => i + 1
+                ).map(
+                  (p) =>
+                    Math.abs(p - page) <= 2 && ( // show only 2 pages before/after current
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`px-3 py-1 border rounded ${
+                          p === page ? "bg-primary text-white" : ""
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                )}
+
+                <button
+                  onClick={() =>
+                    setPage((prev) => Math.min(prev + 1, data?.totalPages || 1))
+                  }
+                  disabled={page === (data?.totalPages || 1)}
+                  className="px-2 py-1 border rounded disabled:opacity-50"
+                >
+                  {"Next"}
+                </button>
+                <button
+                  onClick={() => setPage(data?.totalPages || 1)}
+                  disabled={page === (data?.totalPages || 1)}
+                  className="px-2 py-1 border rounded disabled:opacity-50"
+                >
+                  {">>"}
+                </button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
