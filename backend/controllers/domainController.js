@@ -6,7 +6,10 @@ const { Op } = require("sequelize");
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require("uuid");
 const dayjs = require("dayjs");
-const fs = require("fs");
+const fs = require('fs');
+const csv = require('csv-parser');
+const { Parser } = require('json2csv');
+
 
 
 const saveDomainAndUser = async (req, res) => {
@@ -173,12 +176,28 @@ const getUserDomains = async (req, res) => {
     });
   }
 };
-
 const getDomainCreateData = async (req, res) => {
   try {
-    // Fetch all domains ordered by ID descending
-    const domains = await Domain.findAll({
-      order: [["id", "DESC"]],
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Build search condition
+    const domainWhere = search
+      ? {
+          [Op.or]: [
+            { domain: { [Op.like]: `%${search}%` } },
+            { fname: { [Op.like]: `%${search}%` } },
+            { lname: { [Op.like]: `%${search}%` } },
+          ],
+        }
+      : {};
+
+    // Fetch domains with pagination and search
+    const { rows: domains, count: total } = await Domain.findAndCountAll({
+      where: domainWhere,
+      order: [['id', 'DESC']],
+      offset: parseInt(offset),
+      limit: parseInt(limit),
       raw: true,
     });
 
@@ -197,23 +216,34 @@ const getDomainCreateData = async (req, res) => {
     const purchaseDate = req.query.purchase_date
       ? req.query.purchase_date
       : firstDomain
-      ? dayjs(firstDomain.created_at).format("YYYY-MM-DD")
-      : dayjs().format("YYYY-MM-DD");
+      ? dayjs(firstDomain.created_at).format('YYYY-MM-DD')
+      : dayjs().format('YYYY-MM-DD');
 
     const expiryDate = req.query.expiry_date
       ? req.query.expiry_date
       : firstDomain
-      ? dayjs(firstDomain.created_at).add(1, "year").format("YYYY-MM-DD")
-      : dayjs().add(1, "year").format("YYYY-MM-DD");
+      ? dayjs(firstDomain.created_at).add(1, 'year').format('YYYY-MM-DD')
+      : dayjs().add(1, 'year').format('YYYY-MM-DD');
 
-    // Get all users who have domains_tool = 1
+    // Get all users who have domains_tool = 1 and match search
+    const userWhere = search
+      ? {
+          domains_tool: 1,
+          [Op.or]: [
+            { fname: { [Op.like]: `%${search}%` } },
+            { lname: { [Op.like]: `%${search}%` } },
+            { email: { [Op.like]: `%${search}%` } },
+          ],
+        }
+      : { domains_tool: 1 };
+
     const users = await User.findAll({
-      where: { domains_tool: 1 },
-      attributes: ["id", "fname", "lname", "email"],
-      order: [["fname", "ASC"]],
+      where: userWhere,
+      attributes: ['id', 'fname', 'lname', 'email'],
+      order: [['fname', 'ASC']],
     });
 
-    // Return same data Laravel passes to Blade view
+    // Return data
     return res.status(200).json({
       success: true,
       data: {
@@ -222,17 +252,83 @@ const getDomainCreateData = async (req, res) => {
         firstDomain,
         purchaseDate,
         expiryDate,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / limit),
+        },
       },
     });
   } catch (error) {
-    console.error("Error in getDomainCreateData:", error);
+    console.error('Error in getDomainCreateData:', error);
     return res.status(500).json({
       success: false,
-      message: "Server Error",
+      message: 'Server Error',
       error: error.message,
     });
   }
 };
+
+// const getDomainCreateData = async (req, res) => {
+//   try {
+//     // Fetch all domains ordered by ID descending
+//     const domains = await Domain.findAll({
+//       order: [["id", "DESC"]],
+//       raw: true,
+//     });
+
+//     // Group domains by user_id
+//     const groupedDomains = domains.reduce((acc, domain) => {
+//       if (!acc[domain.user_id]) acc[domain.user_id] = [];
+//       acc[domain.user_id].push(domain);
+//       return acc;
+//     }, {});
+
+//     // Get first domain from first user group (if exists)
+//     const firstUserId = Object.keys(groupedDomains)[0];
+//     const firstDomain = firstUserId ? groupedDomains[firstUserId][0] : null;
+
+//     // Handle purchaseDate and expiryDate similar to Laravel logic
+//     const purchaseDate = req.query.purchase_date
+//       ? req.query.purchase_date
+//       : firstDomain
+//       ? dayjs(firstDomain.created_at).format("YYYY-MM-DD")
+//       : dayjs().format("YYYY-MM-DD");
+
+//     const expiryDate = req.query.expiry_date
+//       ? req.query.expiry_date
+//       : firstDomain
+//       ? dayjs(firstDomain.created_at).add(1, "year").format("YYYY-MM-DD")
+//       : dayjs().add(1, "year").format("YYYY-MM-DD");
+
+//     // Get all users who have domains_tool = 1
+//     const users = await User.findAll({
+//       where: { domains_tool: 1 },
+//       attributes: ["id", "fname", "lname", "email"],
+//       order: [["fname", "ASC"]],
+//     });
+
+//     // Return same data Laravel passes to Blade view
+//     return res.status(200).json({
+//       success: true,
+//       data: {
+//         domains: groupedDomains,
+//         users,
+//         firstDomain,
+//         purchaseDate,
+//         expiryDate,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error in getDomainCreateData:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server Error",
+//       error: error.message,
+//     });
+//   }
+// };
 
 const importDomainsCsv = async (req, res) => {
   try {
@@ -477,4 +573,74 @@ const destroyDomain = async (req, res) => {
   }
 };
 
-module.exports = { saveDomainAndUser, getUserDomains, getDomainCreateData, importDomainsCsv, updateDomainStatus, destroyDomain};
+const exportDomainsCsv = async (req, res) => {
+  try {
+    const selectedIds = (req.query.selected_ids || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+
+    // Fetch selected domains or all
+    const domains = selectedIds.length
+      ? await Domain.findAll({ where: { id: selectedIds } })
+      : await Domain.findAll();
+
+    const filename = `domains_list_${dayjs().format("YYYY-MM-DD")}.csv`;
+
+    const csvFields = [
+      "Domain",
+      "User Name",
+      "User Email",
+      "Purchase Date",
+      "Expiry Date",
+      "Status",
+    ];
+
+    const csvData = [];
+    const exportedDomainNames = [];
+
+    domains.forEach((domain) => {
+      const requestInfo = domain.request_info ? JSON.parse(domain.request_info) : {};
+      let domainNames = [];
+      if (Array.isArray(requestInfo.result)) {
+        domainNames = requestInfo.result;
+      } else if (requestInfo.domain_name) {
+        domainNames = [requestInfo.domain_name];
+      }
+
+      const registeredInfo = domain.registered_info ? JSON.parse(domain.registered_info) : {};
+      const attributes = registeredInfo.data?.["@attributes"] || null;
+      const statusText = domain.registered === 1 ? "Active" : "Inactive";
+
+      domainNames.forEach((domainName) => {
+        if (!domainName || exportedDomainNames.includes(domainName)) return;
+        exportedDomainNames.push(domainName);
+
+        csvData.push({
+          Domain: domainName,
+          "User Name": `${domain.fname} ${domain.lname}`,
+          "User Email": domain.email,
+          "Purchase Date": dayjs(domain.created_at).format("MMM DD, YYYY"),
+          "Expiry Date": dayjs(domain.created_at).add(1, "year").format("MMM DD, YYYY"),
+          Status: statusText,
+        });
+      });
+    });
+
+    const json2csvParser = new Parser({ fields: csvFields });
+    const csv = json2csvParser.parse(csvData);
+
+    res.header("Content-Type", "text/csv");
+    res.attachment(filename);
+    return res.send(csv);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
+      error: error.message,
+    });
+  }
+};
+
+module.exports = { saveDomainAndUser, getUserDomains, getDomainCreateData, importDomainsCsv, updateDomainStatus, destroyDomain, exportDomainsCsv};

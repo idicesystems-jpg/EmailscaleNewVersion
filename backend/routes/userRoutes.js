@@ -11,7 +11,7 @@ const {
   updateStatus,
   deleteUser,
   exportCsv,
-  getUsersWithoutPagination
+  getUsersWithoutPagination,
 } = require("../controllers/userController");
 const {
   getAllTransactions,
@@ -21,7 +21,19 @@ const {
   deleteTransaction,
 } = require("../controllers/transactionController");
 
-const { saveDomainAndUser, getUserDomains, getDomainCreateData, importDomainsCsv, updateDomainStatus, destroyDomain } = require("../controllers/domainController");
+const {
+  saveDomainAndUser,
+  getUserDomains,
+  getDomainCreateData,
+  importDomainsCsv,
+  updateDomainStatus,
+  destroyDomain,
+  exportDomainsCsv,
+} = require("../controllers/domainController");
+
+const {
+  getEmailProviderCounts, emailWarmup, deleteWarmupEmail
+} = require("../controllers/emailWarmupController");
 
 // Routes
 router.post("/login", login);
@@ -45,7 +57,13 @@ router.post("/save-domain", saveDomainAndUser);
 router.get("/domains/:user_id", getUserDomains);
 router.get("/all-domains", getDomainCreateData);
 router.post("/import-domains", upload.single("import_file"), importDomainsCsv);
-router.put('/domains/:id/status', updateDomainStatus);
-router.delete('/domains/:id', destroyDomain);
+router.put("/domains/:id/status", updateDomainStatus);
+router.delete("/domains/:id", destroyDomain);
+router.get("/export-domains", exportDomainsCsv);
+
+//emailWarmup Routes.
+router.get("/email-provider-counts", getEmailProviderCounts);
+router.get("/email-warmup", emailWarmup);
+router.delete('/email-warmup/:id', deleteWarmupEmail);
 
 module.exports = router;

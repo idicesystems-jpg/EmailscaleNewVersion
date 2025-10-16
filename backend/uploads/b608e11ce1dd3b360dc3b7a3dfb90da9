@@ -1,0 +1,4 @@
+domainName,userName,email,purchaseDate,expiryDate,statusLabel
+example1.com,John Doe,john@example.com,October 1, 2025,October 1, 2026,Active
+example2.com,Jane Smith,jane@example.com,October 5, 2025,October 5, 2026,Inactive
+example3.net,Bob Johnson,bob@example.com,October 10, 2025,October 10, 2026,Active
