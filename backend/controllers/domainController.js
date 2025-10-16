@@ -6,6 +6,7 @@ const { Op } = require("sequelize");
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require("uuid");
 const dayjs = require("dayjs");
+const fs = require("fs");
 
 
 const saveDomainAndUser = async (req, res) => {

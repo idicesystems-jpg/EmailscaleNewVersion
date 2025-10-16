@@ -8,6 +8,12 @@ export const adminUserService = apiSlice.injectEndpoints({
       providesTags: ["Users"],
     }),
 
+     // New allUsers endpoint
+    allUsers: builder.query({
+      query: () => 'all-users',
+      providesTags: ['Users'],
+    }),
+
     exportUsersCsv: builder.query({
       query: () => ({
         url: "export-csv",
@@ -117,5 +123,6 @@ export const {
   useUpdateSubscriptionMutation,
   useUpdateUserMutation,
   useUpdateUserStatusMutation,
-  useLazyExportUsersCsvQuery
+  useLazyExportUsersCsvQuery,
+  useAllUsersQuery 
 } = adminUserService;

@@ -31,7 +31,7 @@ export const adminDomainService = apiSlice.injectEndpoints({
     // Delete a domain
     deleteDomain: builder.mutation({
       query: (domainId) => ({
-        url: `delete-domain/${domainId}`,
+        url: `domains/${domainId}`,
         method: "DELETE",
       }),
       invalidatesTags: ["Domains"],
@@ -56,11 +56,25 @@ export const adminDomainService = apiSlice.injectEndpoints({
       }),
     }),
 
+     importDomains: builder.mutation({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append("import_file", file);
+
+        return {
+          url: "import-domains",
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: ["Domains"], // optionally refresh the list after import
+    }),
+
     // Update domain status (Active / Inactive)
     updateDomainStatus: builder.mutation({
-      query: ({ domainId, status }) => ({
-        url: `update-domain-status/${domainId}`,
-        method: "PATCH",
+      query: ({ id, status }) => ({
+        url: `domains/${id}/status`,
+        method: "PUT",
         body: { status },
       }),
       invalidatesTags: ["Domains"],
@@ -76,4 +90,5 @@ export const {
   useDeleteDomainMutation,
   useUpdateDomainStatusMutation,
   useLazyExportDomainsCsvQuery,
+  useImportDomainsMutation 
 } = adminDomainService;

@@ -41,7 +41,11 @@ import {
 import {
   useCreateDomainMutation,
   useFetchDomainsQuery,
+  useUpdateDomainStatusMutation,
+  useDeleteDomainMutation,
+  useImportDomainsMutation
 } from "../../services/adminDomainService";
+import { useAllUsersQuery } from "../../services/adminUserService";
 import DomainTable from "../../components/DomainTable";
 
 const AdminDomains = () => {
@@ -53,9 +57,20 @@ const AdminDomains = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { data: users } = useAllUsersQuery();
+
+  //console.log("Users data:", users); // Debugging line
+
+
   const { data, error, isLoading } = useFetchDomainsQuery();
 
   const actualDomainsData = data ? data.data.domains : [];
+
+  //update domain status
+  const [updateDomainStatus] = useUpdateDomainStatusMutation();
+
+   const [deleteDomain] = useDeleteDomainMutation();
+
 
   //add domain with user creation
   const [createUser, setCreateUser] = useState(false);
@@ -239,116 +254,47 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
     window.URL.revokeObjectURL(url);
   };
 
-  const handleCSVUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
 
-    setUploading(true);
-    try {
-      const text = await file.text();
-      const lines = text.split("\n").filter((line) => line.trim());
+  const [importDomains] = useImportDomainsMutation();
+ const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  
+  const file = event.target.files?.[0];
+  if (!file) return;
 
-      if (lines.length < 2) {
-        toast.error("CSV file is empty or invalid");
-        return;
-      }
+  setUploading(true);
 
-      const headers = lines[0].split(",").map((h) => h.trim());
-      const domains: any[] = [];
-      const errors: string[] = [];
+  try {
+    const text = await file.text();
+    const lines = text.split("\n").filter((line) => line.trim());
 
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(",").map((v) => v.trim());
-
-        if (values.length !== headers.length) {
-          errors.push(`Line ${i + 1}: Invalid number of columns`);
-          continue;
-        }
-
-        const domain: any = {};
-        headers.forEach((header, index) => {
-          domain[header] = values[index];
-        });
-
-        // Validate required fields
-        if (!domain.domain_name) {
-          errors.push(`Line ${i + 1}: Missing domain_name`);
-          continue;
-        }
-        if (!domain.user_email) {
-          errors.push(`Line ${i + 1}: Missing user_email`);
-          continue;
-        }
-
-        // Find user by email
-        const { data: userData, error: userError } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("email", domain.user_email)
-          .maybeSingle();
-
-        if (userError || !userData) {
-          errors.push(
-            `Line ${i + 1}: User with email ${domain.user_email} not found`
-          );
-          continue;
-        }
-
-        domains.push({
-          domain_name: domain.domain_name,
-          user_id: userData.id,
-          registrar: domain.registrar || null,
-          purchase_date: domain.purchase_date || null,
-          expiry_date: domain.expiry_date || null,
-          status: domain.status || "pending",
-          notes: domain.notes || null,
-        });
-      }
-
-      if (domains.length === 0) {
-        toast.error("No valid domains to import");
-        if (errors.length > 0) {
-          console.error("Import errors:", errors);
-        }
-        return;
-      }
-
-      // Bulk insert
-      const { error: insertError } = await supabase
-        .from("domains")
-        .insert(domains);
-
-      if (insertError) {
-        toast.error("Error importing domains");
-        console.error(insertError);
-      } else {
-        toast.success(
-          `Successfully imported ${domains.length} domain${
-            domains.length > 1 ? "s" : ""
-          }`
-        );
-        if (errors.length > 0) {
-          toast.warning(
-            `${errors.length} row${
-              errors.length > 1 ? "s" : ""
-            } skipped due to errors`
-          );
-        }
-        setUploadDialogOpen(false);
-        fetchDomains();
-      }
-    } catch (error) {
-      console.error("CSV parsing error:", error);
-      toast.error("Error parsing CSV file");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+    if (lines.length < 2) {
+      toast.error("CSV file is empty or invalid");
+      return;
     }
-  };
+
+    // Optional: parse headers if needed for validation
+    const headers = lines[0].split(",").map((h) => h.trim());
+    const errors: string[] = [];
+
+    // Call RTK mutation directly with the file
+    try {
+      await importDomains(file).unwrap(); // <- your RTK Query mutation
+      toast.success(`CSV imported successfully`);
+    } catch (mutationError) {
+      console.error("Import failed:", mutationError);
+      toast.error("Error importing CSV file");
+    }
+  } catch (error) {
+    console.error("CSV reading/parsing error:", error);
+    toast.error("Error reading CSV file");
+  } finally {
+    setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+};
+
 
  
 
@@ -506,19 +452,19 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                             Select Existing User (based on previous domain
                             entries)
                           </Label>
-                          {/* <select
+                          <select
                             name="user_id"
                             value={formData.user_id || ""}
                             onChange={handleInputChange}
                             className="border rounded px-2 py-1 w-full"
                           >
                             <option value="">Select...</option>
-                            {users.map((user) => (
+                            {users?.users?.map((user) => (
                               <option key={user.id} value={user.id}>
                                 {user.fname} {user.lname} ({user.email})
                               </option>
                             ))}
-                          </select> */}
+                          </select>
                           {errors.user_id && (
                             <p className="text-red-500 text-sm">
                               {errors.user_id}
@@ -732,7 +678,7 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
           </CardHeader>
           <CardContent>
             
-              <DomainTable domainsData={actualDomainsData} />
+              <DomainTable domainsData={actualDomainsData} updateDomainStatus={updateDomainStatus} deleteDomain={deleteDomain} />
               
           </CardContent>
         </Card>

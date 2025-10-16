@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface Domain {
   id: number;
@@ -35,11 +36,12 @@ interface GroupedDomains {
 
 interface DomainTableProps {
   domainsData: GroupedDomains;
+  updateDomainStatus: (args: { id: number; status: string }) => Promise<any>;
+  deleteDomain: (domainId: number) => Promise<any>;
 }
 
- const DomainTable = ({ domainsData }: DomainTableProps) => {
-
-  console.log("domainsData:", domainsData); // Debugging line
+const DomainTable: React.FC<DomainTableProps> = ({ domainsData, updateDomainStatus,deleteDomain }) => {
+  //console.log("domainsData:", domainsData); // Debugging line
   const [selectedDomains, setSelectedDomains] = useState<number[]>([]);
   const [domainStatuses, setDomainStatuses] = useState<Record<number, number>>({});
   const { toast } = useToast();
@@ -76,14 +78,40 @@ interface DomainTableProps {
     );
   };
 
-  const handleStatusChange = (domainId: number, newStatus: string) => {
-    const statusValue = newStatus === "active" ? 1 : 0;
-    setDomainStatuses((prev) => ({ ...prev, [domainId]: statusValue }));
+  const handleStatusChange = async (domainId: number, newStatus: string) => {
+  const statusValue = newStatus === "active" ? 1 : 0;
+
+  // Update local state immediately
+  setDomainStatuses((prev) => ({ ...prev, [domainId]: statusValue }));
+  console.log(`Changing status for domain ID ${domainId} to ${newStatus}`);
+  try {
+    // Call the mutation
+    await updateDomainStatus({ id: domainId, status: newStatus });
+
+    // Show success toast
     toast({
-      title: "Status Updated",
-      description: `Domain status updated to ${newStatus}`,
+      title: "Success",
+      description: `Domain status updated`,
     });
-  };
+   
+  } catch (error) {
+    console.error("Failed to update domain status:", error);
+
+    // Optionally revert local state if mutation fails
+    setDomainStatuses((prev) => ({
+      ...prev,
+      [domainId]: prev[domainId] === 1 ? 0 : 1,
+    }));
+
+    toast({
+      title: "Error",
+      description: "Could not update domain status. Please try again.",
+      variant: "destructive",
+    });
+   
+  }
+};
+
 
   const handleRegister = (orderId: string | null) => {
     if (orderId) {
@@ -94,11 +122,25 @@ interface DomainTableProps {
     }
   };
 
-  const handleDelete = (domainId: number) => {
-    if (window.confirm("Are you sure you want to delete this domain?")) {
+  const handleDelete = async (domainId: number) => {
+    if (!window.confirm("Are you sure you want to delete this domain?")) return;
+
+    try {
+      // Call the RTK mutation
+      await deleteDomain(domainId);
+
+      // Show success toast
       toast({
         title: "Domain Deleted",
         description: "Domain deleted successfully",
+      });
+    } catch (error) {
+      console.error("Failed to delete domain:", error);
+
+      toast({
+        title: "Deletion Failed",
+        description: "Could not delete the domain. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -140,6 +182,7 @@ interface DomainTableProps {
         <tbody className="divide-y divide-border">
           {Object.entries(domainsData).map(([userId, userDomains]) => {
             const firstDomain = userDomains[0];
+            //console.log("First domain:", firstDomain); // Debugging line
             const domainNames = extractDomainNames(userDomains);
             const currentStatus = domainStatuses[firstDomain.id] ?? firstDomain.registered;
 
@@ -193,8 +236,8 @@ interface DomainTableProps {
 
                 <td className="px-6 py-4">
                   <Select
-                    value={currentStatus === 1 ? "active" : "inactive"}
-                    onValueChange={(value) => handleStatusChange(firstDomain.id, value)}
+                    value={currentStatus === 1 ? "1" : "0"}
+                    onValueChange={(value) => handleStatusChange(firstDomain?.id, value)}
                   >
                     <SelectTrigger
                       className={`w-32 rounded-full border-0 font-medium ${
@@ -206,8 +249,8 @@ interface DomainTableProps {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="1">Active</SelectItem>
+                      <SelectItem value="0">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
                 </td>
