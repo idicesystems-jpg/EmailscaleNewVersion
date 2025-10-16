@@ -1,13 +1,44 @@
 import { useEffect, useState, useRef } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Trash2, Search, AlertTriangle, Calendar, Upload, Download } from "lucide-react";
+import {
+  Trash2,
+  Search,
+  AlertTriangle,
+  Calendar,
+  Upload,
+  Download,
+  UserPlus,
+  Globe,
+} from "lucide-react";
+import { useCreateDomainMutation } from "../../services/adminDomainService";
 
 const AdminDomains = () => {
   const [domains, setDomains] = useState<any[]>([]);
@@ -15,7 +46,102 @@ const AdminDomains = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  //add domain with user creation
+  const [createUser, setCreateUser] = useState(false);
+  const [createDomain, { isLoading }] = useCreateDomainMutation();
+
+  const [formData, setFormData] = useState({
+    domain_name: "",
+    purchase_date: "",
+    expiry_date: "",
+    status: "Active",
+    first_name: "",
+    last_name: "",
+    email: "",
+    password: "",
+    phone: "",
+    company_name: "",
+  });
+  const [errors, setErrors] = useState({});
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === "checkbox" ? checked : value,
+    });
+  };
+
+  const validate = () => {
+    const newErrors = {};
+
+    if (!formData.domain_name.trim())
+      newErrors.domain_name = "Domain name is required";
+    if (!formData.purchase_date)
+      newErrors.purchase_date = "Purchase date required";
+    if (!formData.expiry_date) newErrors.expiry_date = "Expiry date required";
+
+    if (createUser) {
+      if (!formData.first_name.trim())
+        newErrors.first_name = "First name required";
+      if (!formData.last_name.trim())
+        newErrors.last_name = "Last name required";
+      if (!formData.email.trim()) newErrors.email = "Email required";
+      if (!formData.password.trim()) newErrors.password = "Password required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) return;
+
+    try {
+      const payload = {
+        create_user: createUser,
+        domain_info: {
+          domain_name: formData.domain_name,
+          purchase_date: formData.purchase_date,
+          expiry_date: formData.expiry_date,
+          status: formData.status,
+        },
+        user_info: createUser
+          ? {
+              first_name: formData.first_name,
+              last_name: formData.last_name,
+              email: formData.email,
+              password: formData.password,
+              phone: formData.phone,
+              company_name: formData.company_name,
+            }
+          : null,
+      };
+
+      const res = await createDomain(payload).unwrap();
+      toast.success("Domain added successfully!");
+      setDialogOpen(false);
+      setFormData({
+        domain_name: "",
+        purchase_date: "",
+        expiry_date: "",
+        status: "Active",
+        first_name: "",
+        last_name: "",
+        email: "",
+        password: "",
+        phone: "",
+        company_name: "",
+      });
+    } catch (error) {
+      toast.error("Failed to add domain");
+      console.error(error);
+    }
+  };
+  //add domain with existing user
 
   useEffect(() => {
     fetchDomains();
@@ -24,12 +150,14 @@ const AdminDomains = () => {
   const fetchDomains = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('domains')
-      .select(`
+      .from("domains")
+      .select(
+        `
         *,
         profiles:user_id (full_name, email)
-      `)
-      .order('expiry_date', { ascending: true });
+      `
+      )
+      .order("expiry_date", { ascending: true });
 
     if (error) {
       toast.error("Error fetching domains");
@@ -44,9 +172,9 @@ const AdminDomains = () => {
     if (!confirm("Are you sure you want to delete this domain?")) return;
 
     const { error } = await supabase
-      .from('domains')
+      .from("domains")
       .delete()
-      .eq('id', domainId);
+      .eq("id", domainId);
 
     if (error) {
       toast.error("Error deleting domain");
@@ -60,37 +188,39 @@ const AdminDomains = () => {
     const template = `domain_name,user_email,registrar,purchase_date,expiry_date,status,notes
 example.com,user@example.com,GoDaddy,2024-01-01,2025-01-01,active,Sample domain
 mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another example`;
-    
-    const blob = new Blob([template], { type: 'text/csv' });
+
+    const blob = new Blob([template], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'domains_template.csv';
+    a.download = "domains_template.csv";
     a.click();
     window.URL.revokeObjectURL(url);
   };
 
-  const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCSVUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
     try {
       const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      
+      const lines = text.split("\n").filter((line) => line.trim());
+
       if (lines.length < 2) {
         toast.error("CSV file is empty or invalid");
         return;
       }
 
-      const headers = lines[0].split(',').map(h => h.trim());
+      const headers = lines[0].split(",").map((h) => h.trim());
       const domains: any[] = [];
       const errors: string[] = [];
 
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        
+        const values = lines[i].split(",").map((v) => v.trim());
+
         if (values.length !== headers.length) {
           errors.push(`Line ${i + 1}: Invalid number of columns`);
           continue;
@@ -113,13 +243,15 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
 
         // Find user by email
         const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', domain.user_email)
+          .from("profiles")
+          .select("id")
+          .eq("email", domain.user_email)
           .maybeSingle();
 
         if (userError || !userData) {
-          errors.push(`Line ${i + 1}: User with email ${domain.user_email} not found`);
+          errors.push(
+            `Line ${i + 1}: User with email ${domain.user_email} not found`
+          );
           continue;
         }
 
@@ -129,8 +261,8 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
           registrar: domain.registrar || null,
           purchase_date: domain.purchase_date || null,
           expiry_date: domain.expiry_date || null,
-          status: domain.status || 'pending',
-          notes: domain.notes || null
+          status: domain.status || "pending",
+          notes: domain.notes || null,
         });
       }
 
@@ -144,16 +276,24 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
 
       // Bulk insert
       const { error: insertError } = await supabase
-        .from('domains')
+        .from("domains")
         .insert(domains);
 
       if (insertError) {
         toast.error("Error importing domains");
         console.error(insertError);
       } else {
-        toast.success(`Successfully imported ${domains.length} domain${domains.length > 1 ? 's' : ''}`);
+        toast.success(
+          `Successfully imported ${domains.length} domain${
+            domains.length > 1 ? "s" : ""
+          }`
+        );
         if (errors.length > 0) {
-          toast.warning(`${errors.length} row${errors.length > 1 ? 's' : ''} skipped due to errors`);
+          toast.warning(
+            `${errors.length} row${
+              errors.length > 1 ? "s" : ""
+            } skipped due to errors`
+          );
         }
         setUploadDialogOpen(false);
         fetchDomains();
@@ -164,12 +304,12 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
 
-  const filteredDomains = domains.filter(domain => {
+  const filteredDomains = domains.filter((domain) => {
     const query = searchQuery.toLowerCase();
     return (
       domain.domain_name?.toLowerCase().includes(query) ||
@@ -188,17 +328,17 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
     return diffDays;
   };
 
-  const domainsExpiring30 = domains.filter(d => {
+  const domainsExpiring30 = domains.filter((d) => {
     const days = getDaysUntilExpiry(d.expiry_date);
     return days !== null && days > 0 && days <= 30;
   }).length;
 
-  const domainsExpiring60 = domains.filter(d => {
+  const domainsExpiring60 = domains.filter((d) => {
     const days = getDaysUntilExpiry(d.expiry_date);
     return days !== null && days > 0 && days <= 60;
   }).length;
 
-  const expiredDomains = domains.filter(d => {
+  const expiredDomains = domains.filter((d) => {
     const days = getDaysUntilExpiry(d.expiry_date);
     return days !== null && days <= 0;
   }).length;
@@ -207,8 +347,12 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Domain Management</h1>
-          <p className="text-muted-foreground">Track domain ownership and expiry dates</p>
+          <h1 className="text-3xl font-bold text-foreground">
+            Domain Management
+          </h1>
+          <p className="text-muted-foreground">
+            Track domain ownership and expiry dates
+          </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -220,7 +364,9 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{domains.length}</div>
+              <div className="text-2xl font-bold text-primary">
+                {domains.length}
+              </div>
             </CardContent>
           </Card>
           <Card className={expiredDomains > 0 ? "border-red-500" : ""}>
@@ -231,7 +377,9 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-500">{expiredDomains}</div>
+              <div className="text-2xl font-bold text-red-500">
+                {expiredDomains}
+              </div>
             </CardContent>
           </Card>
           <Card className={domainsExpiring30 > 0 ? "border-orange-500" : ""}>
@@ -242,7 +390,9 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-500">{domainsExpiring30}</div>
+              <div className="text-2xl font-bold text-orange-500">
+                {domainsExpiring30}
+              </div>
             </CardContent>
           </Card>
           <Card className={domainsExpiring60 > 0 ? "border-yellow-500" : ""}>
@@ -253,7 +403,9 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-500">{domainsExpiring60}</div>
+              <div className="text-2xl font-bold text-yellow-500">
+                {domainsExpiring60}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -263,7 +415,9 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>All Domains</CardTitle>
-                <CardDescription>Monitor domain status, ownership, and expiry dates</CardDescription>
+                <CardDescription>
+                  Monitor domain status, ownership, and expiry dates
+                </CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <div className="relative w-72">
@@ -275,15 +429,185 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                     className="pl-10"
                   />
                 </div>
-                <Button 
-                  variant="outline" 
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Globe className="h-4 w-4 mr-2" /> Add Domain
+                    </Button>
+                  </DialogTrigger>
+
+                  <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                      <DialogTitle>Add New Domain</DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={createUser}
+                          onChange={(e) => setCreateUser(e.target.checked)}
+                        />
+                        <Label>Create new user</Label>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Domain Information */}
+                        <div>
+                          <h3 className="font-semibold mb-2">
+                            Domain Information
+                          </h3>
+                          <Label>Domain Name</Label>
+                          <Input
+                            name="domain_name"
+                            value={formData.domain_name}
+                            onChange={handleInputChange}
+                          />
+                          {errors.domain_name && (
+                            <p className="text-red-500 text-sm">
+                              {errors.domain_name}
+                            </p>
+                          )}
+
+                          <Label>Purchase Date</Label>
+                          <Input
+                            type="date"
+                            name="purchase_date"
+                            value={formData.purchase_date}
+                            onChange={handleInputChange}
+                          />
+                          {errors.purchase_date && (
+                            <p className="text-red-500 text-sm">
+                              {errors.purchase_date}
+                            </p>
+                          )}
+
+                          <Label>Expiry Date</Label>
+                          <Input
+                            type="date"
+                            name="expiry_date"
+                            value={formData.expiry_date}
+                            onChange={handleInputChange}
+                          />
+                          {errors.expiry_date && (
+                            <p className="text-red-500 text-sm">
+                              {errors.expiry_date}
+                            </p>
+                          )}
+
+                          <Label>Status</Label>
+
+                          <select
+                            name="status"
+                            value={formData.status}
+                            onChange={handleInputChange}
+                            className="w-full border rounded-md p-2"
+                          >
+                            <option value="1">Active</option>
+                            <option value="0">Inactive</option>
+                          </select>
+                        </div>
+
+                        {/* User Information */}
+                        {createUser && (
+                          <div>
+                            <h3 className="font-semibold mb-2">
+                              User Information
+                            </h3>
+                            <Label>First Name</Label>
+                            <Input
+                              name="first_name"
+                              value={formData.first_name}
+                              onChange={handleInputChange}
+                            />
+                            {errors.first_name && (
+                              <p className="text-red-500 text-sm">
+                                {errors.first_name}
+                              </p>
+                            )}
+
+                            <Label>Last Name</Label>
+                            <Input
+                              name="last_name"
+                              value={formData.last_name}
+                              onChange={handleInputChange}
+                            />
+                            {errors.last_name && (
+                              <p className="text-red-500 text-sm">
+                                {errors.last_name}
+                              </p>
+                            )}
+
+                            <Label>Email</Label>
+                            <Input
+                              type="email"
+                              name="email"
+                              value={formData.email}
+                              onChange={handleInputChange}
+                            />
+                            {errors.email && (
+                              <p className="text-red-500 text-sm">
+                                {errors.email}
+                              </p>
+                            )}
+
+                            <Label>Password</Label>
+                            <Input
+                              type="password"
+                              name="password"
+                              value={formData.password}
+                              onChange={handleInputChange}
+                            />
+                            {errors.password && (
+                              <p className="text-red-500 text-sm">
+                                {errors.password}
+                              </p>
+                            )}
+
+                            <Label>Phone</Label>
+                            <Input
+                              name="phone"
+                              value={formData.phone}
+                              onChange={handleInputChange}
+                            />
+
+                            <Label>Company Name</Label>
+                            <Input
+                              name="company_name"
+                              value={formData.company_name}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end gap-2 mt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => setDialogOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSubmit} disabled={isLoading}>
+                          {isLoading ? "Saving..." : "Add Domain"}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={downloadCSVTemplate}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Template
                 </Button>
-                <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+                <Dialog
+                  open={uploadDialogOpen}
+                  onOpenChange={setUploadDialogOpen}
+                >
                   <DialogTrigger asChild>
                     <Button size="sm">
                       <Upload className="h-4 w-4 mr-2" />
@@ -294,7 +618,8 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                     <DialogHeader>
                       <DialogTitle>Bulk Upload Domains</DialogTitle>
                       <DialogDescription>
-                        Upload a CSV file to import multiple domains at once. Download the template to see the required format.
+                        Upload a CSV file to import multiple domains at once.
+                        Download the template to see the required format.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -308,24 +633,40 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                           className="hidden"
                           id="csv-upload"
                         />
-                        <label 
-                          htmlFor="csv-upload" 
-                          className={`cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        <label
+                          htmlFor="csv-upload"
+                          className={`cursor-pointer ${
+                            uploading ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
                         >
                           <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                           <p className="text-sm font-medium">
-                            {uploading ? 'Uploading...' : 'Click to upload CSV file'}
+                            {uploading
+                              ? "Uploading..."
+                              : "Click to upload CSV file"}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            CSV format: domain_name, user_email, registrar, purchase_date, expiry_date, status, notes
+                            CSV format: domain_name, user_email, registrar,
+                            purchase_date, expiry_date, status, notes
                           </p>
                         </label>
                       </div>
                       <div className="text-xs text-muted-foreground space-y-1">
-                        <p><strong>Required fields:</strong> domain_name, user_email</p>
-                        <p><strong>Optional fields:</strong> registrar, purchase_date, expiry_date, status, notes</p>
-                        <p><strong>Date format:</strong> YYYY-MM-DD</p>
-                        <p><strong>Status values:</strong> active, pending, expired</p>
+                        <p>
+                          <strong>Required fields:</strong> domain_name,
+                          user_email
+                        </p>
+                        <p>
+                          <strong>Optional fields:</strong> registrar,
+                          purchase_date, expiry_date, status, notes
+                        </p>
+                        <p>
+                          <strong>Date format:</strong> YYYY-MM-DD
+                        </p>
+                        <p>
+                          <strong>Status values:</strong> active, pending,
+                          expired
+                        </p>
                       </div>
                     </div>
                   </DialogContent>
@@ -340,7 +681,9 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               </div>
             ) : filteredDomains.length === 0 ? (
               <p className="text-center text-muted-foreground p-8">
-                {searchQuery ? "No domains found matching your search" : "No domains found"}
+                {searchQuery
+                  ? "No domains found matching your search"
+                  : "No domains found"}
               </p>
             ) : (
               <Table>
@@ -358,48 +701,79 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                 </TableHeader>
                 <TableBody>
                   {filteredDomains.map((domain) => {
-                    const daysUntilExpiry = getDaysUntilExpiry(domain.expiry_date);
-                    const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 60;
-                    const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
-                    
+                    const daysUntilExpiry = getDaysUntilExpiry(
+                      domain.expiry_date
+                    );
+                    const isExpiringSoon =
+                      daysUntilExpiry !== null && daysUntilExpiry <= 60;
+                    const isExpired =
+                      daysUntilExpiry !== null && daysUntilExpiry <= 0;
+
                     return (
-                      <TableRow 
+                      <TableRow
                         key={domain.id}
                         className={
-                          isExpired ? 'bg-red-500/10' :
-                          daysUntilExpiry !== null && daysUntilExpiry <= 30 ? 'bg-orange-500/10' :
-                          isExpiringSoon ? 'bg-yellow-500/10' : ''
+                          isExpired
+                            ? "bg-red-500/10"
+                            : daysUntilExpiry !== null && daysUntilExpiry <= 30
+                            ? "bg-orange-500/10"
+                            : isExpiringSoon
+                            ? "bg-yellow-500/10"
+                            : ""
                         }
                       >
-                        <TableCell className="font-medium">{domain.domain_name}</TableCell>
+                        <TableCell className="font-medium">
+                          {domain.domain_name}
+                        </TableCell>
                         <TableCell>
-                          {domain.profiles?.full_name || domain.profiles?.email || "—"}
+                          {domain.profiles?.full_name ||
+                            domain.profiles?.email ||
+                            "—"}
                         </TableCell>
                         <TableCell>{domain.registrar || "—"}</TableCell>
                         <TableCell>
-                          {domain.purchase_date ? new Date(domain.purchase_date).toLocaleDateString() : "—"}
+                          {domain.purchase_date
+                            ? new Date(
+                                domain.purchase_date
+                              ).toLocaleDateString()
+                            : "—"}
                         </TableCell>
                         <TableCell>
-                          {domain.expiry_date ? new Date(domain.expiry_date).toLocaleDateString() : "—"}
+                          {domain.expiry_date
+                            ? new Date(domain.expiry_date).toLocaleDateString()
+                            : "—"}
                         </TableCell>
                         <TableCell>
                           {daysUntilExpiry !== null ? (
-                            <span className={`font-medium ${
-                              isExpired ? 'text-red-500' :
-                              daysUntilExpiry <= 30 ? 'text-orange-500' :
-                              daysUntilExpiry <= 60 ? 'text-yellow-500' :
-                              'text-foreground'
-                            }`}>
-                              {isExpired ? 'Expired' : `${daysUntilExpiry} days`}
+                            <span
+                              className={`font-medium ${
+                                isExpired
+                                  ? "text-red-500"
+                                  : daysUntilExpiry <= 30
+                                  ? "text-orange-500"
+                                  : daysUntilExpiry <= 60
+                                  ? "text-yellow-500"
+                                  : "text-foreground"
+                              }`}
+                            >
+                              {isExpired
+                                ? "Expired"
+                                : `${daysUntilExpiry} days`}
                             </span>
-                          ) : "—"}
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            domain.status === 'active' ? 'bg-green-500/20 text-green-500' :
-                            domain.status === 'pending' ? 'bg-orange-500/20 text-orange-500' :
-                            'bg-red-500/20 text-red-500'
-                          }`}>
+                          <span
+                            className={`px-2 py-1 rounded text-xs ${
+                              domain.status === "active"
+                                ? "bg-green-500/20 text-green-500"
+                                : domain.status === "pending"
+                                ? "bg-orange-500/20 text-orange-500"
+                                : "bg-red-500/20 text-red-500"
+                            }`}
+                          >
                             {domain.status}
                           </span>
                         </TableCell>
