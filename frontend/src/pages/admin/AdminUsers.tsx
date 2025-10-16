@@ -58,29 +58,49 @@ import {
   useTogglePauseMutation,
   useChangePasswordMutation,
   useUpdateSubscriptionMutation,
+  useUpdateUserMutation,
+  useUpdateUserStatusMutation,
+  useLazyExportUsersCsvQuery,
 } from "../../services/adminUserService";
 
 const AdminUsers = () => {
   const navigate = useNavigate();
   const { setImpersonation } = useImpersonation();
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [newPassword, setNewPassword] = useState("");
+
+  const [editForm, setEditForm] = useState(false);
+
+  //fetch users code
+  const { data, error, isLoading } = useFetchUsersQuery();
+
+  const users = data?.users || [];
+
+  console.log("Fetched users:", users || []);
+
+  //fetch users code
+
+  //add user code
   // Define type for errors
-interface FormErrors {
-  fname?: string;
-  lname?: string;
-  email?: string;
-  phone?: string;
-  company_name?: string;
-  password?: string;
-  password_confirmation?: string;
-}
+  interface FormErrors {
+    fname?: string;
+    lname?: string;
+    email?: string;
+    phone?: string;
+    company_name?: string;
+    password?: string;
+    password_confirmation?: string;
+    status?: string;
+    amount?: string;
+    ghl_tool?: string;
+    // Remove duplicate and fix interface
+  }
+
   const [formData, setFormData] = useState({
     fname: "",
     lname: "",
@@ -92,16 +112,29 @@ interface FormErrors {
     email_tool: false,
     domains_tool: false,
     warm_up_tool: false,
+    ghl_tool: false,
+    amount: 0,
+    status: "",
   });
 
+  console.log("Form Data:", formData);
+
   const [errors, setErrors] = useState<FormErrors>({});
-const [createUser, { isLoading: creating }] = useCreateUserMutation();
+  const [createUser, { isLoading: creating }] = useCreateUserMutation();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
     }));
   };
 
@@ -112,16 +145,21 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
     if (!formData.lname.trim()) newErrors.lname = "Last Name is required";
 
     if (!formData.email.trim()) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid";
+    else if (!/\S+@\S+\.\S+/.test(formData.email))
+      newErrors.email = "Email is invalid";
 
     if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
-    else if (!/^\d{10}$/.test(formData.phone)) newErrors.phone = "Phone number must be 10 digits";
+    else if (!/^\d{10}$/.test(formData.phone))
+      newErrors.phone = "Phone number must be 10 digits";
 
-    if (!formData.company_name.trim()) newErrors.company_name = "Company Name is required";
+    if (!formData.company_name.trim())
+      newErrors.company_name = "Company Name is required";
 
     if (!formData.password) newErrors.password = "Password is required";
-    if (!formData.password_confirmation) newErrors.password_confirmation = "Confirm Password is required";
-    else if (formData.password !== formData.password_confirmation) newErrors.password_confirmation = "Passwords do not match";
+    if (!formData.password_confirmation)
+      newErrors.password_confirmation = "Confirm Password is required";
+    else if (formData.password !== formData.password_confirmation)
+      newErrors.password_confirmation = "Passwords do not match";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -151,53 +189,109 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
         email_tool: false,
         domains_tool: false,
         warm_up_tool: false,
+        ghl_tool: false,
+        amount: 0,
+        status: "",
       });
-      refetch();
     } catch (err: any) {
       toast.error(err.data?.message || "Error creating user");
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  ///add user code
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      toast.error("Error fetching users");
-      console.error(error);
-    } else {
-      setUsers(data || []);
-    }
-    setLoading(false);
+  // Function to handle edit click and populate form with user data
+  const handleEditClick = (user: any) => {
+    setFormData({
+      fname: user.fname || "",
+      lname: user.lname || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      company_name: user.company_name || "",
+      password: "",
+      password_confirmation: "",
+      email_tool: user.email_tool || false,
+      domains_tool: user.domains_tool || false,
+      warm_up_tool: user.warm_up_tool || false,
+      ghl_tool: user.ghl_tool || false,
+      amount: user.amount || 0,
+      status: user.status || "",
+    });
+    setSelectedUser(user);
+    setEditForm(true);
   };
 
- 
+  const [updateUser, { isLoading: updating }] = useUpdateUserMutation();
+
+  const handleUpdateUser = async () => {
+    try {
+      await updateUser({ userId: selectedUser.id, ...formData }).unwrap();
+      toast.success("User updated successfully!");
+      setEditForm(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update user");
+    }
+  };
+
+  //update user code
+
+  //update status code
+  const [updateUserStatus, { isLoading: isUpdating }] =
+    useUpdateUserStatusMutation();
+  const handleToggleUserStatusPause = async (userId, isPaused) => {
+    try {
+      // Toggle pause status
+      const newStatus = !isPaused;
+
+      await updateUserStatus({
+        userId,
+        status: newStatus, // 👈 backend expects 'status'
+      }).unwrap();
+
+      toast.success(
+        newStatus ? "User account paused successfully" : "User account resumed"
+      );
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      toast.error("Failed to update user status");
+    }
+  };
+
+  //update status code
+
+  //delete user code
+  const [deleteUser, { isLoading: deleting }] = useDeleteUserMutation();
+
+  const handleDeleteUser = async (userId) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+
+    try {
+      const result = await deleteUser(userId).unwrap();
+      toast.success("User deleted successfully");
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error("Error deleting user");
+    }
+  };
+  //delete user code
+
+  //export user code
+  const [triggerExportCsv] = useLazyExportUsersCsvQuery();
+  const handleExportCsv = async () => {
+    try {
+      await triggerExportCsv().unwrap();
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export CSV");
+    }
+  };
+  //export user code
 
   const handleViewAsUser = (userId: string, email: string) => {
     setImpersonation(userId, email);
     navigate("/dashboard");
     toast.success(`Now viewing as ${email}`);
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
-
-    const { error } = await supabase.auth.admin.deleteUser(userId);
-
-    if (error) {
-      toast.error("Error deleting user");
-      console.error(error);
-    } else {
-      toast.success("User deleted successfully");
-      fetchUsers();
-    }
   };
 
   const handleToggleLock = async (userId: string, currentlyLocked: boolean) => {
@@ -212,7 +306,6 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
       toast.success(
         `Account ${!currentlyLocked ? "locked" : "unlocked"} successfully`
       );
-      fetchUsers();
     }
   };
 
@@ -231,7 +324,6 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
       toast.success(
         `Account ${!currentlyPaused ? "paused" : "resumed"} successfully`
       );
-      fetchUsers();
     }
   };
 
@@ -270,11 +362,10 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
       toast.success(`Subscription updated to ${plan}`);
       setSubscriptionDialogOpen(false);
       setSelectedUser(null);
-      fetchUsers();
     }
   };
 
-  const filteredUsers = users.filter((user) => {
+  const filteredUsers = users?.filter((user) => {
     const query = searchQuery.toLowerCase();
     return (
       user.full_name?.toLowerCase().includes(query) ||
@@ -300,6 +391,7 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
                 Add User
               </Button>
             </DialogTrigger>
+
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
@@ -307,48 +399,107 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
                   Add a new user to the system
                 </DialogDescription>
               </DialogHeader>
-               {/* Inputs without <form> */}
+              {/* Inputs without <form> */}
               <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                 <div className="space-y-2">
                   <Label htmlFor="fname">First Name</Label>
-                  <Input id="fname" name="fname" value={formData.fname} onChange={handleInputChange} />
-                  {errors.fname && <p className="text-red-500 text-sm">{errors.fname}</p>}
+                  <Input
+                    id="fname"
+                    name="fname"
+                    value={formData.fname}
+                    onChange={handleInputChange}
+                  />
+                  {errors.fname && (
+                    <p className="text-red-500 text-sm">{errors.fname}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="lname">Last Name</Label>
-                  <Input id="lname" name="lname" value={formData.lname} onChange={handleInputChange} />
-                  {errors.lname && <p className="text-red-500 text-sm">{errors.lname}</p>}
+                  <Input
+                    id="lname"
+                    name="lname"
+                    value={formData.lname}
+                    onChange={handleInputChange}
+                  />
+                  {errors.lname && (
+                    <p className="text-red-500 text-sm">{errors.lname}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
-                  {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                  />
+                  {errors.email && (
+                    <p className="text-red-500 text-sm">{errors.email}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} />
-                  {errors.phone && <p className="text-red-500 text-sm">{errors.phone}</p>}
+                  <Input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                  />
+                  {errors.phone && (
+                    <p className="text-red-500 text-sm">{errors.phone}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="company_name">Company Name</Label>
-                  <Input id="company_name" name="company_name" value={formData.company_name} onChange={handleInputChange} />
-                  {errors.company_name && <p className="text-red-500 text-sm">{errors.company_name}</p>}
+                  <Input
+                    id="company_name"
+                    name="company_name"
+                    value={formData.company_name}
+                    onChange={handleInputChange}
+                  />
+                  {errors.company_name && (
+                    <p className="text-red-500 text-sm">
+                      {errors.company_name}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input id="password" name="password" type="password" value={formData.password} onChange={handleInputChange} />
-                  {errors.password && <p className="text-red-500 text-sm">{errors.password}</p>}
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                  />
+                  {errors.password && (
+                    <p className="text-red-500 text-sm">{errors.password}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password_confirmation">Confirm Password</Label>
-                  <Input id="password_confirmation" name="password_confirmation" type="password" value={formData.password_confirmation} onChange={handleInputChange} />
-                  {errors.password_confirmation && <p className="text-red-500 text-sm">{errors.password_confirmation}</p>}
+                  <Label htmlFor="password_confirmation">
+                    Confirm Password
+                  </Label>
+                  <Input
+                    id="password_confirmation"
+                    name="password_confirmation"
+                    type="password"
+                    value={formData.password_confirmation}
+                    onChange={handleInputChange}
+                  />
+                  {errors.password_confirmation && (
+                    <p className="text-red-500 text-sm">
+                      {errors.password_confirmation}
+                    </p>
+                  )}
                 </div>
 
                 {/* Checkbox Access */}
@@ -356,22 +507,204 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
                   <Label>Access Tools</Label>
                   <div className="flex gap-4">
                     <label className="flex items-center gap-1">
-                      <input type="checkbox" name="email_tool" checked={formData.email_tool} onChange={handleInputChange} /> Email Tool
+                      <input
+                        type="checkbox"
+                        name="email_tool"
+                        checked={formData.email_tool}
+                        onChange={handleInputChange}
+                      />{" "}
+                      Email Tool
                     </label>
                     <label className="flex items-center gap-1">
-                      <input type="checkbox" name="domains_tool" checked={formData.domains_tool} onChange={handleInputChange} /> Domains Tool
+                      <input
+                        type="checkbox"
+                        name="domains_tool"
+                        checked={formData.domains_tool}
+                        onChange={handleInputChange}
+                      />{" "}
+                      Domains Tool
                     </label>
                     <label className="flex items-center gap-1">
-                      <input type="checkbox" name="warm_up_tool" checked={formData.warm_up_tool} onChange={handleInputChange} /> WarmUp Tool
+                      <input
+                        type="checkbox"
+                        name="warm_up_tool"
+                        checked={formData.warm_up_tool}
+                        onChange={handleInputChange}
+                      />{" "}
+                      WarmUp Tool
                     </label>
                   </div>
                 </div>
-                <Button onClick={handleCreateUser} className="w-full" loading={creating}>
-                  Create User
+                <Button
+                  onClick={handleCreateUser}
+                  className="w-full"
+                  disabled={creating}
+                >
+                  {creating ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
+                      Creating...
+                    </span>
+                  ) : (
+                    "Create User"
+                  )}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
+
+          {editForm && (
+            <Dialog open={editForm} onOpenChange={setEditForm}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Update New User</DialogTitle>
+                  <DialogDescription>
+                    Update user to the system
+                  </DialogDescription>
+                </DialogHeader>
+                {/* Inputs without <form> */}
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="fname">First Name</Label>
+                    <Input
+                      id="fname"
+                      name="fname"
+                      value={formData.fname}
+                      onChange={handleInputChange}
+                    />
+                    {errors.fname && (
+                      <p className="text-red-500 text-sm">{errors.fname}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="lname">Last Name</Label>
+                    <Input
+                      id="lname"
+                      name="lname"
+                      value={formData.lname}
+                      onChange={handleInputChange}
+                    />
+                    {errors.lname && (
+                      <p className="text-red-500 text-sm">{errors.lname}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                    />
+                    {errors.email && (
+                      <p className="text-red-500 text-sm">{errors.email}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Amount</Label>
+                    <Input
+                      id="amount"
+                      name="amount"
+                      type="number"
+                      value={formData.amount}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <select
+                      id="status"
+                      name="status"
+                      value={formData.status}
+                      onChange={handleSelectChange}
+                      className="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="">Select Status</option>
+                      <option value="1">Active</option>
+                      <option value="0">Inactive</option>
+                    </select>
+                    {errors.status && (
+                      <p className="text-red-500 text-sm">{errors.status}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                    />
+                    {errors.password && (
+                      <p className="text-red-500 text-sm">{errors.password}</p>
+                    )}
+                  </div>
+                  {/* Checkbox Access */}
+                  <div className="space-y-2">
+                    <Label>Access Tools</Label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          name="email_tool"
+                          checked={formData.email_tool}
+                          onChange={handleInputChange}
+                        />{" "}
+                        Email Tool
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          name="domains_tool"
+                          checked={formData.domains_tool}
+                          onChange={handleInputChange}
+                        />{" "}
+                        Domains Tool
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          name="warm_up_tool"
+                          checked={formData.warm_up_tool}
+                          onChange={handleInputChange}
+                        />{" "}
+                        WarmUp Tool
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          name="ghl_tool"
+                          checked={formData.ghl_tool}
+                          onChange={handleInputChange}
+                        />{" "}
+                        GHL Tool
+                      </label>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleUpdateUser}
+                    className="w-full"
+                    disabled={updating}
+                  >
+                    {updating ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
+                        Updating...
+                      </span>
+                    ) : (
+                      "Update User"
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -381,7 +714,7 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {users.length}
+                {users?.length}
               </div>
             </CardContent>
           </Card>
@@ -394,7 +727,7 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
             <CardContent>
               <div className="text-2xl font-bold text-primary">
                 {
-                  users.filter((u) => !u.account_locked && !u.account_paused)
+                  users?.filter((u) => !u.account_locked && !u.account_paused)
                     .length
                 }
               </div>
@@ -408,7 +741,7 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-500">
-                {users.filter((u) => u.account_locked).length}
+                {users?.filter((u) => u.account_locked).length}
               </div>
             </CardContent>
           </Card>
@@ -420,7 +753,7 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-500">
-                {users.filter((u) => u.account_paused).length}
+                {users?.filter((u) => u.account_paused).length}
               </div>
             </CardContent>
           </Card>
@@ -432,6 +765,12 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
               <div>
                 <CardTitle>All Users</CardTitle>
                 <CardDescription>View and manage user accounts</CardDescription>
+              </div>
+              <div className="relative w-72">
+                <Button onClick={handleExportCsv}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
               </div>
               <div className="relative w-72">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -476,7 +815,7 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
                       className={user.account_locked ? "bg-destructive/5" : ""}
                     >
                       <TableCell className="font-medium">
-                        {user.full_name || "—"}
+                        {user.name || "—"}
                       </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.phone || "—"}</TableCell>
@@ -503,16 +842,14 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
                       <TableCell>
                         <span
                           className={`px-2 py-1 rounded text-xs ${
-                            user.account_locked
+                            user.status == "1"
                               ? "bg-red-500/20 text-red-500"
-                              : user.subscription_status === "active"
+                              : user.status == "1"
                               ? "bg-green-500/20 text-green-500"
                               : "bg-orange-500/20 text-orange-500"
                           }`}
                         >
-                          {user.account_locked
-                            ? "Locked"
-                            : user.subscription_status || "active"}
+                          {user.status == "1" ? "Active" : "Inactive"}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -547,9 +884,7 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() =>
-                              handleViewAsUser(user.id, user.email)
-                            }
+                            onClick={() => handleEditClick(user)}
                             title="View as User"
                           >
                             <Eye className="h-4 w-4" />
@@ -576,20 +911,21 @@ const [createUser, { isLoading: creating }] = useCreateUserMutation();
                             variant="ghost"
                             size="sm"
                             onClick={() =>
-                              handleTogglePause(user.id, user.account_paused)
+                              handleToggleUserStatusPause(user.id, user.status)
                             }
                             title={
-                              user.account_paused
-                                ? "Resume account"
-                                : "Pause account"
+                              user.status == "1"
+                                ? "Pause account"
+                                : "Resume account"
                             }
                           >
-                            {user.account_paused ? (
-                              <Play className="h-4 w-4 text-green-500" />
+                            {user.status == "1" ? (
+                              <Pause className="h-4 w-4 text-red-500" />
                             ) : (
-                              <Pause className="h-4 w-4" />
+                              <Play className="h-4 w-4 text-green-500" />
                             )}
                           </Button>
+
                           <Button
                             variant="ghost"
                             size="sm"

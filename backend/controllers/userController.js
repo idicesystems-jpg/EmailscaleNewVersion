@@ -280,6 +280,7 @@ const updateUser = async (req, res) => {
             amount
         } = req.body;
 
+
         // Prepare user update data
         const data = {
             name: `${fname} ${lname}`,
