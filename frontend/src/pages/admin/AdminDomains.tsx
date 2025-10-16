@@ -54,18 +54,41 @@ const AdminDomains = () => {
   const [createDomain, { isLoading }] = useCreateDomainMutation();
 
   const [formData, setFormData] = useState({
+    // Domain Information
     domain_name: "",
+    registered: "1",
     purchase_date: "",
     expiry_date: "",
     status: "Active",
-    first_name: "",
-    last_name: "",
+
+    // User Information
+    create_new_user: createUser,
+    fname: "",
+    lname: "",
     email: "",
     password: "",
     phone: "",
     company_name: "",
+    user_id: "",
   });
-  const [errors, setErrors] = useState({});
+
+  type ErrorsType = {
+    domain_name?: string;
+    purchase_date?: string;
+    expiry_date?: string;
+    registered?: string;
+    fname?: string;
+    lname?: string;
+    email?: string;
+    password?: string;
+    phone?: string;
+    company_name?: string;
+    user_id?: string;
+    first_name?: string;
+    last_name?: string;
+  };
+
+  const [errors, setErrors] = useState<ErrorsType>({});
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -75,22 +98,51 @@ const AdminDomains = () => {
     });
   };
 
+  console.log("Form Data:", formData);
+
   const validate = () => {
-    const newErrors = {};
+    const newErrors: ErrorsType = {};
 
-    if (!formData.domain_name.trim())
+    // --- Domain Fields ---
+    if (!formData.domain_name.trim()) {
       newErrors.domain_name = "Domain name is required";
-    if (!formData.purchase_date)
-      newErrors.purchase_date = "Purchase date required";
-    if (!formData.expiry_date) newErrors.expiry_date = "Expiry date required";
+    }
 
-    if (createUser) {
-      if (!formData.first_name.trim())
-        newErrors.first_name = "First name required";
-      if (!formData.last_name.trim())
-        newErrors.last_name = "Last name required";
-      if (!formData.email.trim()) newErrors.email = "Email required";
-      if (!formData.password.trim()) newErrors.password = "Password required";
+    if (!formData.purchase_date) {
+      newErrors.purchase_date = "Purchase date is required";
+    }
+
+    if (!formData.expiry_date) {
+      newErrors.expiry_date = "Expiry date is required";
+    }
+
+    if (!formData.registered) {
+      newErrors.registered = "Registration info is required";
+    }
+
+    // --- User Fields ---
+    if (formData.create_new_user) {
+      if (!formData.fname.trim()) newErrors.fname = "First name is required";
+      if (!formData.lname.trim()) newErrors.lname = "Last name is required";
+      if (!formData.email.trim()) newErrors.email = "Email is required";
+      else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email))
+        newErrors.email = "Invalid email format";
+
+      if (!formData.password.trim())
+        newErrors.password = "Password is required";
+      else if (formData.password.length < 6)
+        newErrors.password = "Password must be at least 6 characters";
+
+      if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
+      else if (!/^[0-9]{10,15}$/.test(formData.phone))
+        newErrors.phone = "Invalid phone number";
+
+      if (!formData.company_name.trim())
+        newErrors.company_name = "Company name is required";
+    } else {
+      if (!formData.user_id.trim()) {
+        newErrors.user_id = "Please select an existing user";
+      }
     }
 
     setErrors(newErrors);
@@ -100,47 +152,30 @@ const AdminDomains = () => {
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    try {
-      const payload = {
-        create_user: createUser,
-        domain_info: {
-          domain_name: formData.domain_name,
-          purchase_date: formData.purchase_date,
-          expiry_date: formData.expiry_date,
-          status: formData.status,
-        },
-        user_info: createUser
-          ? {
-              first_name: formData.first_name,
-              last_name: formData.last_name,
-              email: formData.email,
-              password: formData.password,
-              phone: formData.phone,
-              company_name: formData.company_name,
-            }
-          : null,
-      };
+    const payload = {
+      domain_name: formData.domain_name,
+      purchase_date: formData.purchase_date,
+      expiry_date: formData.expiry_date,
+      registered: formData.registered,
+      fname: formData.fname,
+      lname: formData.lname,
+      email: formData.email,
+      password: formData.password,
+      phone: formData.phone,
+      company_name: formData.company_name,
+      user_id: formData.user_id,
+    };
 
-      const res = await createDomain(payload).unwrap();
-      toast.success("Domain added successfully!");
+    try {
+      await createDomain(payload).unwrap();
+      toast.success("Domain created successfully!");
       setDialogOpen(false);
-      setFormData({
-        domain_name: "",
-        purchase_date: "",
-        expiry_date: "",
-        status: "Active",
-        first_name: "",
-        last_name: "",
-        email: "",
-        password: "",
-        phone: "",
-        company_name: "",
-      });
-    } catch (error) {
-      toast.error("Failed to add domain");
-      console.error(error);
+    } catch (err) {
+      toast.error("Failed to create domain");
+      console.error(err);
     }
   };
+
   //add domain with existing user
 
   useEffect(() => {
@@ -469,6 +504,29 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                             </p>
                           )}
 
+                          <Label>
+                            Select Existing User (based on previous domain
+                            entries)
+                          </Label>
+                          {/* <select
+                            name="user_id"
+                            value={formData.user_id || ""}
+                            onChange={handleInputChange}
+                            className="border rounded px-2 py-1 w-full"
+                          >
+                            <option value="">Select...</option>
+                            {users.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.fname} {user.lname} ({user.email})
+                              </option>
+                            ))}
+                          </select> */}
+                          {errors.user_id && (
+                            <p className="text-red-500 text-sm">
+                              {errors.user_id}
+                            </p>
+                          )}
+
                           <Label>Purchase Date</Label>
                           <Input
                             type="date"
@@ -498,8 +556,8 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                           <Label>Status</Label>
 
                           <select
-                            name="status"
-                            value={formData.status}
+                            name="registered"
+                            value={formData.registered}
                             onChange={handleInputChange}
                             className="w-full border rounded-md p-2"
                           >
@@ -516,25 +574,25 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
                             </h3>
                             <Label>First Name</Label>
                             <Input
-                              name="first_name"
-                              value={formData.first_name}
+                              name="fname"
+                              value={formData.fname}
                               onChange={handleInputChange}
                             />
-                            {errors.first_name && (
+                            {errors.fname && (
                               <p className="text-red-500 text-sm">
-                                {errors.first_name}
+                                {errors.fname}
                               </p>
                             )}
 
                             <Label>Last Name</Label>
                             <Input
-                              name="last_name"
-                              value={formData.last_name}
+                              name="lname"
+                              value={formData.lname}
                               onChange={handleInputChange}
                             />
-                            {errors.last_name && (
+                            {errors.lname && (
                               <p className="text-red-500 text-sm">
-                                {errors.last_name}
+                                {errors.lname}
                               </p>
                             )}
 
