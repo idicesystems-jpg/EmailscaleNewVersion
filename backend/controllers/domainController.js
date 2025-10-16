@@ -23,6 +23,7 @@ const saveDomainAndUser = async (req, res) => {
       phone,
       company_name
     } = req.body;
+    console.log("Request Body:", req.body);
 
     // 1️⃣ Check if domain already exists
     const existingDomain = await Domain.findOne({ where: { domain: domain_name } });
@@ -127,7 +128,7 @@ const saveDomainAndUser = async (req, res) => {
     return res.status(200).json({ success: true, message: "Domain saved successfully." });
 
   } catch (error) {
-    console.error("Error saving domain:", error);cls
+    console.error("Error saving domain:", error);
     return res.status(500).json({ success: false, message: "Server error.", error: error.message });
   }
 };

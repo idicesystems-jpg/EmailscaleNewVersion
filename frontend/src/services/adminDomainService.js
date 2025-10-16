@@ -11,7 +11,7 @@ export const adminDomainService = apiSlice.injectEndpoints({
     // Create a new domain (with optional user creation)
     createDomain: builder.mutation({
       query: (domainData) => ({
-        url: "add-domain",
+        url: "save-domain",
         method: "POST",
         body: domainData,
       }),
