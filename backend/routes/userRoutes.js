@@ -11,6 +11,7 @@ const {
   updateStatus,
   deleteUser,
   exportCsv,
+  getUsersWithoutPagination
 } = require("../controllers/userController");
 const {
   getAllTransactions,
@@ -26,6 +27,7 @@ const { saveDomainAndUser, getUserDomains, getDomainCreateData, importDomainsCsv
 router.post("/login", login);
 router.post("/register", register);
 router.get("/users", getUsers);
+router.get("/all-users", getUsersWithoutPagination);
 router.put("/update-user/:id", updateUser);
 router.post("/add-user", addUser);
 router.put("/update-status/:id", updateStatus);

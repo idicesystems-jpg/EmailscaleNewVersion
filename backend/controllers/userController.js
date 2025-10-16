@@ -189,6 +189,24 @@ const getUsers = async (req, res) => {
     }
 };
 
+const getUsersWithoutPagination = async (req, res) => {
+    try {
+        // Select all users
+        const users = await User.findAll(); // SELECT * FROM users
+        return res.status(200).json({
+            status: true,
+            users
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            status: false,
+            message: 'Something went wrong',
+            error: error.message
+        });
+    }
+};
+
 
 const addUser = async (req, res) => {
     try {
@@ -455,5 +473,6 @@ module.exports = {
   addUser,
   updateStatus,
   deleteUser,
-  exportCsv
+  exportCsv,
+  getUsersWithoutPagination
 };
