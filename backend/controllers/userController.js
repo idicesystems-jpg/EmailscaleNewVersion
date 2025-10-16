@@ -8,6 +8,7 @@ const speakeasy = require('speakeasy');
 const crypto = require('crypto');
 const { crteate_crm_user } = require('../helpers/crmHelper');
 const { Parser } = require('json2csv');
+const { Op } = require('sequelize');
 
 
 const login = async (req, res) => {
@@ -169,25 +170,69 @@ const register = async (req, res) => {
         });
     }
 };
-
-
 const getUsers = async (req, res) => {
-    try {
-        // Select all users
-        const users = await User.findAll(); // SELECT * FROM users
-        return res.status(200).json({
-            status: true,
-            users
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            status: false,
-            message: 'Something went wrong',
-            error: error.message
-        });
-    }
+  try {
+    const { search = '', page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Build search condition
+    const whereCondition = search
+      ? {
+          [Op.or]: [
+            { email: { [Op.like]: `%${search}%` } },
+            { fname: { [Op.like]: `%${search}%` } },
+            { lname: { [Op.like]: `%${search}%` } },
+          ],
+        }
+      : {};
+
+    // Fetch total count for pagination
+    const totalUsers = await User.count({ where: whereCondition });
+
+    // Fetch users with pagination
+    const users = await User.findAll({
+      where: whereCondition,
+      offset: parseInt(offset),
+      limit: parseInt(limit),
+      order: [['id', 'ASC']], // optional ordering
+    });
+
+    return res.status(200).json({
+      status: true,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total: totalUsers,
+      totalPages: Math.ceil(totalUsers / limit),
+      users,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: false,
+      message: 'Something went wrong',
+      error: error.message,
+    });
+  }
 };
+
+
+// const getUsers = async (req, res) => {
+//     try {
+//         // Select all users
+//         const users = await User.findAll(); // SELECT * FROM users
+//         return res.status(200).json({
+//             status: true,
+//             users
+//         });
+//     } catch (error) {
+//         console.error(error);
+//         return res.status(500).json({
+//             status: false,
+//             message: 'Something went wrong',
+//             error: error.message
+//         });
+//     }
+// };
 
 const getUsersWithoutPagination = async (req, res) => {
     try {
