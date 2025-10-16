@@ -1,10 +1,11 @@
 const User = require('../models/User');
 const RegisterPayment = require('../models/RegisterPayment');
+// const { Domain, User } = require("../models");
 const Domain = require('../models/Domain');
 const { Op } = require("sequelize");
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require("uuid");
-
+const dayjs = require("dayjs");
 
 
 const saveDomainAndUser = async (req, res) => {
@@ -172,5 +173,307 @@ const getUserDomains = async (req, res) => {
   }
 };
 
+const getDomainCreateData = async (req, res) => {
+  try {
+    // Fetch all domains ordered by ID descending
+    const domains = await Domain.findAll({
+      order: [["id", "DESC"]],
+      raw: true,
+    });
 
-module.exports = { saveDomainAndUser, getUserDomains };
+    // Group domains by user_id
+    const groupedDomains = domains.reduce((acc, domain) => {
+      if (!acc[domain.user_id]) acc[domain.user_id] = [];
+      acc[domain.user_id].push(domain);
+      return acc;
+    }, {});
+
+    // Get first domain from first user group (if exists)
+    const firstUserId = Object.keys(groupedDomains)[0];
+    const firstDomain = firstUserId ? groupedDomains[firstUserId][0] : null;
+
+    // Handle purchaseDate and expiryDate similar to Laravel logic
+    const purchaseDate = req.query.purchase_date
+      ? req.query.purchase_date
+      : firstDomain
+      ? dayjs(firstDomain.created_at).format("YYYY-MM-DD")
+      : dayjs().format("YYYY-MM-DD");
+
+    const expiryDate = req.query.expiry_date
+      ? req.query.expiry_date
+      : firstDomain
+      ? dayjs(firstDomain.created_at).add(1, "year").format("YYYY-MM-DD")
+      : dayjs().add(1, "year").format("YYYY-MM-DD");
+
+    // Get all users who have domains_tool = 1
+    const users = await User.findAll({
+      where: { domains_tool: 1 },
+      attributes: ["id", "fname", "lname", "email"],
+      order: [["fname", "ASC"]],
+    });
+
+    // Return same data Laravel passes to Blade view
+    return res.status(200).json({
+      success: true,
+      data: {
+        domains: groupedDomains,
+        users,
+        firstDomain,
+        purchaseDate,
+        expiryDate,
+      },
+    });
+  } catch (error) {
+    console.error("Error in getDomainCreateData:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};
+
+const importDomainsCsv = async (req, res) => {
+  try {
+    const file = req.file;
+
+    // Validate file
+    if (!file) {
+      return res.status(400).json({ success: false, message: "Missing CSV file upload." });
+    }
+
+    const filePath = file.path;
+    const csvData = [];
+    const errors = [];
+    let importedCount = 0;
+
+    // Read CSV file
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on("data", (row) => csvData.push(row))
+      .on("end", async () => {
+        for (let index = 0; index < csvData.length; index++) {
+          const row = csvData[index];
+          const domainName = row["domainName"] || row["Domain Name"];
+          const userName = row["userName"] || row["User Name"];
+          const email = row["email"] || row["Email"];
+          const purchaseDate = row["purchaseDate"] || row["Purchase Date"];
+          const expiryDate = row["expiryDate"] || row["Expiry Date"];
+          const statusLabel = row["statusLabel"] || row["Status"];
+
+          // Check minimum required columns
+          if (!domainName || !email || !purchaseDate || !expiryDate) {
+            errors.push(`Row ${index + 2} skipped: incomplete data.`);
+            continue;
+          }
+
+          // Validate and format dates
+          let purchaseDateFormatted, expiryDateFormatted;
+          try {
+            purchaseDateFormatted = dayjs(purchaseDate, "MMMM D, YYYY").format("YYYY-MM-DD");
+            expiryDateFormatted = dayjs(expiryDate, "MMMM D, YYYY").format("YYYY-MM-DD");
+          } catch (e) {
+            errors.push(`Row ${index + 2}: Invalid date format.`);
+            continue;
+          }
+
+          // Find user by email
+          const user = await User.findOne({ where: { email: email.trim() } });
+          if (!user) {
+            errors.push(`Row ${index + 2}: User not found with email ${email}.`);
+            continue;
+          }
+
+          // Check if domain already exists
+          const existingDomain = await Domain.findOne({ where: { domain: domainName.trim() } });
+          if (existingDomain) {
+            errors.push(`Row ${index + 2}: Domain ${domainName} already exists.`);
+            continue;
+          }
+
+          // Set user details
+          const fname = user.fname || userName?.split(" ")[0] || "N/A";
+          const lname = user.lname || userName?.split(" ")[1] || "N/A";
+          const isActive = String(statusLabel).toLowerCase().trim() === "active" ? 1 : 0;
+
+          // Get previous domains for this user
+          const previousDomains = await Domain.findAll({
+            where: { user_id: user.id },
+            attributes: ["request_info"],
+          });
+
+          const allPrevious = previousDomains
+            .map((d) => {
+              try {
+                const info = JSON.parse(d.request_info || "{}");
+                return info.result || [];
+              } catch {
+                return [];
+              }
+            })
+            .flat();
+
+          const allDomains = [...new Set([...allPrevious, domainName.trim()])];
+
+          // Insert new domain
+          await Domain.create({
+            fname,
+            lname,
+            email: email.trim(),
+            phone: user.phone || null,
+            user_id: user.id,
+            domain: domainName.trim(),
+            registered: isActive,
+            purchase_date: purchaseDateFormatted,
+            expiry_date: expiryDateFormatted,
+            request_info: JSON.stringify({
+              user_id: user.id,
+              fname,
+              lname,
+              email,
+              phone: user.phone || null,
+              domain_name: domainName.trim(),
+              result: allDomains,
+            }),
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+
+          importedCount++;
+        }
+
+        // Delete the uploaded file after processing
+        fs.unlinkSync(filePath);
+
+        if (importedCount > 0 && errors.length === 0) {
+          return res.status(200).json({
+            success: true,
+            message: `${importedCount} domains imported successfully.`,
+          });
+        } else if (importedCount > 0) {
+          return res.status(200).json({
+            success: true,
+            message: `${importedCount} domains imported. Some rows had issues.`,
+            details: errors,
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "No domains were imported.",
+            details: errors,
+          });
+        }
+      });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
+      error: error.message,
+    });
+  }
+};
+
+const updateDomainStatus = async (req, res) => {
+  try {
+    const { id } = req.params; // Domain ID from params
+    const { status } = req.body; // Status from request body
+
+    // Validation: status must be 0 or 1
+    if (status !== 0 && status !== 1 && status !== '0' && status !== '1') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status value. Must be 0 or 1."
+      });
+    }
+
+    // Find the domain
+    const domain = await Domain.findByPk(id);
+    if (!domain) {
+      return res.status(404).json({
+        success: false,
+        message: "Domain not found."
+      });
+    }
+
+    // Update the registered column
+    domain.registered = status;
+    await domain.save();
+
+    // Send success response (like redirect in Laravel)
+    return res.json({
+      success: true,
+      message: "Domain status updated successfully!",
+      domain
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
+      error: err.message
+    });
+  }
+};
+
+const destroyDomain = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the domain by ID
+    const domain = await Domain.findByPk(id);
+    if (!domain) {
+      return res.status(404).json({
+        success: false,
+        message: "Domain not found."
+      });
+    }
+
+    // Get all domains for the same user
+    const domains = await Domain.findAll({ where: { user_id: domain.user_id } });
+
+    let deletedCount = 0;
+    let skippedCount = 0;
+
+    for (const d of domains) {
+      let registeredInfo = d.registered_info ? JSON.parse(d.registered_info) : {};
+      let attributes = registeredInfo.data?.["@attributes"] || {};
+      let isRegistered = attributes.Registered || 'false';
+
+      // Calculate expiry date: created_at + 1 year
+      const expiryDate = dayjs(d.created_at).add(1, 'year');
+      const isExpired = dayjs().isAfter(expiryDate);
+
+      // Delete only if not active or expired
+      if (isRegistered !== 'true' || isExpired) {
+        await d.destroy(); // permanent delete
+        deletedCount++;
+      } else {
+        skippedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      return res.json({
+        success: true,
+        message: `Deleted ${deletedCount} domain(s). ${skippedCount > 0 ? `${skippedCount} domain(s) were active and not deleted.` : ''}`
+      });
+    } else {
+      return res.json({
+        success: false,
+        message: "No deletable domains found (active and non-expired)."
+      });
+    }
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
+      error: err.message
+    });
+  }
+};
+
+module.exports = { saveDomainAndUser, getUserDomains, getDomainCreateData, importDomainsCsv, updateDomainStatus, destroyDomain};
