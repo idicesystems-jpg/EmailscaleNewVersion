@@ -38,7 +38,11 @@ import {
   UserPlus,
   Globe,
 } from "lucide-react";
-import { useCreateDomainMutation } from "../../services/adminDomainService";
+import {
+  useCreateDomainMutation,
+  useFetchDomainsQuery,
+} from "../../services/adminDomainService";
+import DomainTable from "../../components/DomainTable";
 
 const AdminDomains = () => {
   const [domains, setDomains] = useState<any[]>([]);
@@ -49,9 +53,13 @@ const AdminDomains = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { data, error, isLoading } = useFetchDomainsQuery();
+
+  const actualDomainsData = data ? data.data.domains : [];
+
   //add domain with user creation
   const [createUser, setCreateUser] = useState(false);
-  const [createDomain, { isLoading }] = useCreateDomainMutation();
+  const [createDomain] = useCreateDomainMutation();
 
   const [formData, setFormData] = useState({
     // Domain Information
@@ -97,8 +105,6 @@ const AdminDomains = () => {
       [name]: type === "checkbox" ? checked : value,
     });
   };
-
-  console.log("Form Data:", formData);
 
   const validate = () => {
     const newErrors: ErrorsType = {};
@@ -344,39 +350,31 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
     }
   };
 
-  const filteredDomains = domains.filter((domain) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      domain.domain_name?.toLowerCase().includes(query) ||
-      domain.profiles?.full_name?.toLowerCase().includes(query) ||
-      domain.profiles?.email?.toLowerCase().includes(query) ||
-      domain.registrar?.toLowerCase().includes(query)
-    );
-  });
+ 
 
-  const getDaysUntilExpiry = (expiryDate: string) => {
-    if (!expiryDate) return null;
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const diffTime = expiry.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
+  // const getDaysUntilExpiry = (expiryDate: string) => {
+  //   if (!expiryDate) return null;
+  //   const today = new Date();
+  //   const expiry = new Date(expiryDate);
+  //   const diffTime = expiry.getTime() - today.getTime();
+  //   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  //   return diffDays;
+  // };
 
-  const domainsExpiring30 = domains.filter((d) => {
-    const days = getDaysUntilExpiry(d.expiry_date);
-    return days !== null && days > 0 && days <= 30;
-  }).length;
+  // const domainsExpiring30 = domains.filter((d) => {
+  //   const days = getDaysUntilExpiry(d.expiry_date);
+  //   return days !== null && days > 0 && days <= 30;
+  // }).length;
 
-  const domainsExpiring60 = domains.filter((d) => {
-    const days = getDaysUntilExpiry(d.expiry_date);
-    return days !== null && days > 0 && days <= 60;
-  }).length;
+  // const domainsExpiring60 = domains.filter((d) => {
+  //   const days = getDaysUntilExpiry(d.expiry_date);
+  //   return days !== null && days > 0 && days <= 60;
+  // }).length;
 
-  const expiredDomains = domains.filter((d) => {
-    const days = getDaysUntilExpiry(d.expiry_date);
-    return days !== null && days <= 0;
-  }).length;
+  // const expiredDomains = domains.filter((d) => {
+  //   const days = getDaysUntilExpiry(d.expiry_date);
+  //   return days !== null && days <= 0;
+  // }).length;
 
   return (
     <AdminLayout>
@@ -404,7 +402,7 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               </div>
             </CardContent>
           </Card>
-          <Card className={expiredDomains > 0 ? "border-red-500" : ""}>
+          <Card className="border-red-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -413,11 +411,11 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-500">
-                {expiredDomains}
+                10
               </div>
             </CardContent>
           </Card>
-          <Card className={domainsExpiring30 > 0 ? "border-orange-500" : ""}>
+          <Card className="border-orange-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-orange-500" />
@@ -426,11 +424,11 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-500">
-                {domainsExpiring30}
+                20
               </div>
             </CardContent>
           </Card>
-          <Card className={domainsExpiring60 > 0 ? "border-yellow-500" : ""}>
+          <Card className="border-yellow-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -439,7 +437,7 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-500">
-                {domainsExpiring60}
+                30
               </div>
             </CardContent>
           </Card>
@@ -733,123 +731,9 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="flex justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : filteredDomains.length === 0 ? (
-              <p className="text-center text-muted-foreground p-8">
-                {searchQuery
-                  ? "No domains found matching your search"
-                  : "No domains found"}
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Domain Name</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Registrar</TableHead>
-                    <TableHead>Purchase Date</TableHead>
-                    <TableHead>Expiry Date</TableHead>
-                    <TableHead>Days Until Expiry</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDomains.map((domain) => {
-                    const daysUntilExpiry = getDaysUntilExpiry(
-                      domain.expiry_date
-                    );
-                    const isExpiringSoon =
-                      daysUntilExpiry !== null && daysUntilExpiry <= 60;
-                    const isExpired =
-                      daysUntilExpiry !== null && daysUntilExpiry <= 0;
-
-                    return (
-                      <TableRow
-                        key={domain.id}
-                        className={
-                          isExpired
-                            ? "bg-red-500/10"
-                            : daysUntilExpiry !== null && daysUntilExpiry <= 30
-                            ? "bg-orange-500/10"
-                            : isExpiringSoon
-                            ? "bg-yellow-500/10"
-                            : ""
-                        }
-                      >
-                        <TableCell className="font-medium">
-                          {domain.domain_name}
-                        </TableCell>
-                        <TableCell>
-                          {domain.profiles?.full_name ||
-                            domain.profiles?.email ||
-                            "—"}
-                        </TableCell>
-                        <TableCell>{domain.registrar || "—"}</TableCell>
-                        <TableCell>
-                          {domain.purchase_date
-                            ? new Date(
-                                domain.purchase_date
-                              ).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {domain.expiry_date
-                            ? new Date(domain.expiry_date).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {daysUntilExpiry !== null ? (
-                            <span
-                              className={`font-medium ${
-                                isExpired
-                                  ? "text-red-500"
-                                  : daysUntilExpiry <= 30
-                                  ? "text-orange-500"
-                                  : daysUntilExpiry <= 60
-                                  ? "text-yellow-500"
-                                  : "text-foreground"
-                              }`}
-                            >
-                              {isExpired
-                                ? "Expired"
-                                : `${daysUntilExpiry} days`}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={`px-2 py-1 rounded text-xs ${
-                              domain.status === "active"
-                                ? "bg-green-500/20 text-green-500"
-                                : domain.status === "pending"
-                                ? "bg-orange-500/20 text-orange-500"
-                                : "bg-red-500/20 text-red-500"
-                            }`}
-                          >
-                            {domain.status}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteDomain(domain.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
+            
+              <DomainTable domainsData={actualDomainsData} />
+              
           </CardContent>
         </Card>
       </div>

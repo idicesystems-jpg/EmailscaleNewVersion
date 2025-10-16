@@ -4,7 +4,7 @@ export const adminDomainService = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Fetch all domains
     fetchDomains: builder.query({
-      query: () => "domains",
+      query: () => "all-domains",
       providesTags: ["Domains"],
     }),
 
