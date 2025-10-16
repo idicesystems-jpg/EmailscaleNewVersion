@@ -1,4 +1,6 @@
 const express = require("express");
+const multer = require("multer");
+const upload = multer({ dest: "uploads/" });
 const router = express.Router();
 const {
   login,
@@ -18,7 +20,7 @@ const {
   deleteTransaction,
 } = require("../controllers/transactionController");
 
-const { saveDomainAndUser, getUserDomains } = require("../controllers/domainController");
+const { saveDomainAndUser, getUserDomains, getDomainCreateData, importDomainsCsv, updateDomainStatus, destroyDomain } = require("../controllers/domainController");
 
 // Routes
 router.post("/login", login);
@@ -39,5 +41,9 @@ router.delete("/get/:id", deleteTransaction);
 // domainController route
 router.post("/save-domain", saveDomainAndUser);
 router.get("/domains/:user_id", getUserDomains);
+router.get("/all-domains", getDomainCreateData);
+router.post("/import-domains", upload.single("import_file"), importDomainsCsv);
+router.put('/domains/:id/status', updateDomainStatus);
+router.delete('/domains/:id', destroyDomain);
 
 module.exports = router;
