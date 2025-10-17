@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
 const router = express.Router();
+const authenticateToken = require('../middlewares/authMiddleware');
 const {
   login,
   register,
@@ -32,11 +33,21 @@ const {
 } = require("../controllers/domainController");
 
 const {
-  getEmailProviderCounts, emailWarmup, deleteWarmupEmail
+  getEmailProviderCounts,
+  emailWarmup,
+  deleteWarmupEmail,
+  bulkDeleteWarmupEmail,
+  exportEmailAccounts,
+  exportWarmupCsv
 } = require("../controllers/emailWarmupController");
 
+
+const { saveEmailNew } = require('../controllers/EmailAccountsController');
 // Routes
 router.post("/login", login);
+
+router.use(authenticateToken);
+
 router.post("/register", register);
 router.get("/users", getUsers);
 router.get("/all-users", getUsersWithoutPagination);
@@ -64,6 +75,12 @@ router.get("/export-domains", exportDomainsCsv);
 //emailWarmup Routes.
 router.get("/email-provider-counts", getEmailProviderCounts);
 router.get("/email-warmup", emailWarmup);
-router.delete('/email-warmup/:id', deleteWarmupEmail);
+router.delete("/email-warmup/:id", deleteWarmupEmail);
+router.post("/bulk-delete-warmup-email", bulkDeleteWarmupEmail);
+router.get('/export-email-accounts', exportEmailAccounts);
+router.get('/export-email-warmup-csv', exportWarmupCsv);
 
+
+//EmailAccounts routes.
+router.post('/save-email-new', saveEmailNew);
 module.exports = router;
