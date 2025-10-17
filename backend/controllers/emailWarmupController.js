@@ -242,6 +242,8 @@ const emailWarmup = async (req, res) => {
         campaigns: campaignsWithStats,
         users,
         counts,
+        limit: pageSize,
+        total:totalCount,
         totalPages,
         counts_pool,
       },

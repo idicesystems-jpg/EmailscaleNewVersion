@@ -42,7 +42,7 @@ const {
 } = require("../controllers/emailWarmupController");
 
 
-const { saveEmailNew } = require('../controllers/EmailAccountsController');
+const { saveEmailNew, deleteEmailAccount } = require('../controllers/EmailAccountsController');
 // Routes
 router.post("/login", login);
 
@@ -83,4 +83,5 @@ router.get('/export-email-warmup-csv', exportWarmupCsv);
 
 //EmailAccounts routes.
 router.post('/save-email-new', saveEmailNew);
+router.delete('/delete-email-accounts/:id', deleteEmailAccount);
 module.exports = router;

@@ -58,13 +58,13 @@ const saveEmailNew = async (req, res) => {
 
         const rowNum = i + 2; // because line 1 is header
 
-        // 🧩 Validation
+        //  Validation
         if (!imap_username || !imap_password || !email) {
           errors.push(`Row ${rowNum}: Missing required fields.`);
           continue;
         }
 
-        // 🧩 Check for duplicate IMAP username
+        //  Check for duplicate IMAP username
         const exists = await EmailCampaign.findOne({ where: { imap_username } });
         
         if (exists) {
@@ -73,7 +73,7 @@ const saveEmailNew = async (req, res) => {
         }
 
         try {
-          // 🧩 Verify SMTP connection
+          //  Verify SMTP connection
           const transporter = nodemailer.createTransport({
             host: imap_host || 'smtp.gmail.com',
             port: imap_port ? parseInt(imap_port) : 587,
@@ -86,7 +86,7 @@ const saveEmailNew = async (req, res) => {
 
           await transporter.verify();
 
-          // 🧩 Save record to DB
+          //  Save record to DB
           await EmailCampaign.create({
             email,
             first_name,
@@ -95,7 +95,7 @@ const saveEmailNew = async (req, res) => {
             imap_password,
             imap_host,
             imap_port,
-            campaign_id: 'CMP-' + Math.floor(Math.random() * 10000),
+            campaign_id: 1,
             user_id: 1, // Replace with dynamic user ID if needed
             message: 'Imported successfully',
             email_status: 1
@@ -121,4 +121,25 @@ const saveEmailNew = async (req, res) => {
   }
 };
 
-module.exports = { saveEmailNew };
+const deleteEmailAccount = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if record exists
+    const record = await EmailCampaign.findByPk(id);
+    if (!record) {
+      return res.status(404).json({ status: false, message: 'Email record not found.' });
+    }
+
+    // Delete the record
+    await EmailCampaign.destroy({ where: { id } });
+
+    return res.json({ status: true, message: 'Email deleted successfully!' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ status: false, message: 'Server error.' });
+  }
+};
+
+
+module.exports = { saveEmailNew, deleteEmailAccount };
