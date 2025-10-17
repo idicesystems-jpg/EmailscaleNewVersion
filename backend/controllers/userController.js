@@ -57,11 +57,11 @@ const login = async (req, res) => {
 
         // 4. Generate emailscale_token if not exists
         let token = user.emailscale_token;
-        if (!token) {
-            token = jwt.sign({ id: user.id }, 'your_jwt_secret', { expiresIn: '1d' });
+        // if (!token) {
+            token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
             user.emailscale_token = token;
             await user.save();
-        }
+        // }
 
         // 5. Google 2FA
         let google2fa_response = null;
