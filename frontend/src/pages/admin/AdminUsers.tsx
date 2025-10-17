@@ -62,6 +62,7 @@ import {
   useUpdateUserStatusMutation,
   useLazyExportUsersCsvQuery,
 } from "../../services/adminUserService";
+import Pagination from "../../components/Pagination";
 
 const AdminUsers = () => {
   const navigate = useNavigate();
@@ -980,81 +981,7 @@ const AdminUsers = () => {
                   </TableBody>
                 </Table>
                 {/* Pagination Controls */}
-                <div className="flex justify-between items-center mt-4 flex-wrap gap-2">
-                  {/* Page size selector */}
-                  <div>
-                    <span className="mr-2">Rows per page:</span>
-                    <select
-                      value={limit}
-                      onChange={(e) => {
-                        setLimit(Number(e.target.value));
-                        setPage(1); // Reset page when limit changes
-                      }}
-                      className="border px-2 py-1 rounded"
-                    >
-                      <option value={5}>5</option>
-                      <option value={10}>10</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
-
-                  {/* Pagination buttons */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setPage(1)}
-                      disabled={page === 1}
-                      className="px-2 py-1 border rounded disabled:opacity-50"
-                    >
-                      {"<<"}
-                    </button>
-                    <button
-                      onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                      disabled={page === 1}
-                      className="px-2 py-1 border rounded disabled:opacity-50"
-                    >
-                      {"Prev"}
-                    </button>
-
-                    {/* Page numbers */}
-                    {Array.from(
-                      { length: data?.totalPages || 1 },
-                      (_, i) => i + 1
-                    ).map(
-                      (p) =>
-                        Math.abs(p - page) <= 2 && ( // show only 2 pages before/after current
-                          <button
-                            key={p}
-                            onClick={() => setPage(p)}
-                            className={`px-3 py-1 border rounded ${
-                              p === page ? "bg-primary text-white" : ""
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        )
-                    )}
-
-                    <button
-                      onClick={() =>
-                        setPage((prev) =>
-                          Math.min(prev + 1, data?.totalPages || 1)
-                        )
-                      }
-                      disabled={page === (data?.totalPages || 1)}
-                      className="px-2 py-1 border rounded disabled:opacity-50"
-                    >
-                      {"Next"}
-                    </button>
-                    <button
-                      onClick={() => setPage(data?.totalPages || 1)}
-                      disabled={page === (data?.totalPages || 1)}
-                      className="px-2 py-1 border rounded disabled:opacity-50"
-                    >
-                      {">>"}
-                    </button>
-                  </div>
-                </div>
+                <Pagination page={page} setPage={setPage} limit={limit} total={data?.total} />
               </>
             )}
           </CardContent>
