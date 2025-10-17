@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useImpersonation } from "@/hooks/useImpersonation";
 import emailScaleLogo from "@/assets/emailscale-logo.png";
+import { toast } from "sonner";
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +32,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavLink } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { logout } from "../services/authSlice";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -43,13 +46,18 @@ const menuItems = [
 ];
 
 function AppSidebar() {
+  const dispatch = useDispatch();
   const { state } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
   const { impersonatedUserEmail, clearImpersonation } = useImpersonation();
 
-  const handleLogout = () => {
-    navigate("/auth");
+  const handleLogout = async () => {
+    //await supabase.auth.signOut();
+    // Clear auth state
+    dispatch(logout());
+    navigate("/");
+    toast.success("Logged out successfully");
   };
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>

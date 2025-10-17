@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface Domain {
   id: number;
@@ -35,13 +36,24 @@ interface GroupedDomains {
 
 interface DomainTableProps {
   domainsData: GroupedDomains;
+  updateDomainStatus: (args: { id: number; status: string }) => Promise<any>;
+  deleteDomain: (domainId: number) => Promise<any>;
+  exportDomainsCsv: (args: { ids: number[] }) => Promise<any>;
+  setSelectedIds: (ids: number[]) => void;
 }
 
- const DomainTable = ({ domainsData }: DomainTableProps) => {
-
-  console.log("domainsData:", domainsData); // Debugging line
+const DomainTable: React.FC<DomainTableProps> = ({
+  domainsData,
+  updateDomainStatus,
+  deleteDomain,
+  exportDomainsCsv,
+  setSelectedIds,
+}) => {
+  //console.log("domainsData:", domainsData); // Debugging line
   const [selectedDomains, setSelectedDomains] = useState<number[]>([]);
-  const [domainStatuses, setDomainStatuses] = useState<Record<number, number>>({});
+  const [domainStatuses, setDomainStatuses] = useState<Record<number, number>>(
+    {}
+  );
   const { toast } = useToast();
 
   const extractDomainNames = (domains: Domain[]): string[] => {
@@ -50,7 +62,7 @@ interface DomainTableProps {
     domains.forEach((domain) => {
       try {
         const requestInfo = JSON.parse(domain.request_info);
-        
+
         if (requestInfo.result && Array.isArray(requestInfo.result)) {
           requestInfo.result.forEach((value: string) => {
             if (value && value.trim()) {
@@ -67,22 +79,68 @@ interface DomainTableProps {
 
     return [...new Set(domainNames)];
   };
-
   const handleCheckboxChange = (domainId: number) => {
-    setSelectedDomains((prev) =>
-      prev.includes(domainId)
-        ? prev.filter((id) => id !== domainId)
-        : [...prev, domainId]
-    );
+    setSelectedDomains((prev) => {
+      let updatedSelected;
+      if (prev.includes(domainId)) {
+        // Remove the domainId
+        updatedSelected = prev.filter((id) => id !== domainId);
+      } else {
+        // Add the domainId
+        updatedSelected = [...prev, domainId];
+      }
+
+      // Also update selectedIds for export
+      setSelectedIds(updatedSelected);
+
+      return updatedSelected;
+    });
   };
 
-  const handleStatusChange = (domainId: number, newStatus: string) => {
+  // Select / Deselect all
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(
+        Object.values(domainsData)
+          .flat()
+          .map((d) => d.id)
+      );
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleStatusChange = async (domainId: number, newStatus: string) => {
     const statusValue = newStatus === "active" ? 1 : 0;
+
+    // Update local state immediately
     setDomainStatuses((prev) => ({ ...prev, [domainId]: statusValue }));
-    toast({
-      title: "Status Updated",
-      description: `Domain status updated to ${newStatus}`,
-    });
+    console.log(`Changing status for domain ID ${domainId} to ${newStatus}`);
+    try {
+      // Call the mutation
+      await updateDomainStatus({ id: domainId, status: newStatus });
+
+      // Show success toast
+      toast({
+        title: "Success",
+        description: `Domain status updated`,
+      });
+    } catch (error) {
+      console.error("Failed to update domain status:", error);
+
+      // Optionally revert local state if mutation fails
+      setDomainStatuses((prev) => ({
+        ...prev,
+        [domainId]: prev[domainId] === 1 ? 0 : 1,
+      }));
+
+      toast({
+        title: "Error",
+        description: "Could not update domain status. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleRegister = (orderId: string | null) => {
@@ -94,11 +152,25 @@ interface DomainTableProps {
     }
   };
 
-  const handleDelete = (domainId: number) => {
-    if (window.confirm("Are you sure you want to delete this domain?")) {
+  const handleDelete = async (domainId: number) => {
+    if (!window.confirm("Are you sure you want to delete this domain?")) return;
+
+    try {
+      // Call the RTK mutation
+      await deleteDomain(domainId);
+
+      // Show success toast
       toast({
         title: "Domain Deleted",
         description: "Domain deleted successfully",
+      });
+    } catch (error) {
+      console.error("Failed to delete domain:", error);
+
+      toast({
+        title: "Deletion Failed",
+        description: "Could not delete the domain. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -111,12 +183,30 @@ interface DomainTableProps {
       return "Invalid Date";
     }
   };
-
+  const allDomains = Object.values(domainsData || {}).flat();
   return (
     <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-md">
       <table className="w-full">
         <thead>
           <tr className="border-b border-border bg-muted/50">
+            <th className="px-6 py-4 text-left text-sm font-semibold text-foreground w-12">
+              <Checkbox
+                checked={
+                  selectedDomains.length === allDomains.length &&
+                  allDomains.length > 0
+                }
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    const allIds = allDomains.map((d) => d.id);
+                    setSelectedDomains(allIds);
+                    setSelectedIds(allIds);
+                  } else {
+                    setSelectedDomains([]);
+                    setSelectedIds([]);
+                  }
+                }}
+              />
+            </th>
             <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
               Domain
             </th>
@@ -140,8 +230,10 @@ interface DomainTableProps {
         <tbody className="divide-y divide-border">
           {Object.entries(domainsData).map(([userId, userDomains]) => {
             const firstDomain = userDomains[0];
+            //console.log("First domain:", firstDomain); // Debugging line
             const domainNames = extractDomainNames(userDomains);
-            const currentStatus = domainStatuses[firstDomain.id] ?? firstDomain.registered;
+            const currentStatus =
+              domainStatuses[firstDomain.id] ?? firstDomain.registered;
 
             return (
               <tr
@@ -152,9 +244,16 @@ interface DomainTableProps {
                   <div className="flex items-start gap-3">
                     <Checkbox
                       checked={selectedDomains.includes(firstDomain.id)}
-                      onCheckedChange={() => handleCheckboxChange(firstDomain.id)}
+                      onCheckedChange={() =>
+                        handleCheckboxChange(firstDomain.id)
+                      }
                       className="mt-1"
                     />
+                    
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-start gap-3">
                     <div className="flex flex-col gap-2">
                       {domainNames.map((name, idx) => (
                         <div key={idx} className="flex items-center gap-2">
@@ -181,7 +280,9 @@ interface DomainTableProps {
 
                 <td className="px-6 py-4">
                   <span className="text-sm text-foreground">
-                    {formatDate(firstDomain.purchase_date || firstDomain.created_at)}
+                    {formatDate(
+                      firstDomain.purchase_date || firstDomain.created_at
+                    )}
                   </span>
                 </td>
 
@@ -193,8 +294,10 @@ interface DomainTableProps {
 
                 <td className="px-6 py-4">
                   <Select
-                    value={currentStatus === 1 ? "active" : "inactive"}
-                    onValueChange={(value) => handleStatusChange(firstDomain.id, value)}
+                    value={currentStatus === 1 ? "1" : "0"}
+                    onValueChange={(value) =>
+                      handleStatusChange(firstDomain?.id, value)
+                    }
                   >
                     <SelectTrigger
                       className={`w-32 rounded-full border-0 font-medium ${
@@ -206,15 +309,16 @@ interface DomainTableProps {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="1">Active</SelectItem>
+                      <SelectItem value="0">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
                 </td>
 
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
-                    {currentStatus === 1 && firstDomain.domain_type === "auto" ? (
+                    {currentStatus === 1 &&
+                    firstDomain.domain_type === "auto" ? (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -225,16 +329,19 @@ interface DomainTableProps {
                       </Button>
                     ) : (
                       <>
-                        {currentStatus === 0 && firstDomain.domain_type === "auto" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRegister(firstDomain.order_id)}
-                            className="h-9 w-9 hover:bg-primary-light hover:text-primary"
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                          </Button>
-                        )}
+                        {currentStatus === 0 &&
+                          firstDomain.domain_type === "auto" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                handleRegister(firstDomain.order_id)
+                              }
+                              className="h-9 w-9 hover:bg-primary-light hover:text-primary"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                          )}
                         {currentStatus === 0 && (
                           <Button
                             variant="ghost"

@@ -4,7 +4,18 @@ export const adminDomainService = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Fetch all domains
     fetchDomains: builder.query({
-      query: () => "all-domains",
+      // params: { page?: number, limit?: number, search?: string }
+      query: (
+        params = {}
+      ) => {
+        const queryParams = new URLSearchParams();
+
+        if (params.page) queryParams.append("page", params.page.toString());
+        if (params.limit) queryParams.append("limit", params.limit.toString());
+        if (params.search) queryParams.append("search", params.search);
+
+        return `all-domains?${queryParams.toString()}`;
+      },
       providesTags: ["Domains"],
     }),
 
@@ -31,7 +42,7 @@ export const adminDomainService = apiSlice.injectEndpoints({
     // Delete a domain
     deleteDomain: builder.mutation({
       query: (domainId) => ({
-        url: `delete-domain/${domainId}`,
+        url: `domains/${domainId}`,
         method: "DELETE",
       }),
       invalidatesTags: ["Domains"],
@@ -39,28 +50,40 @@ export const adminDomainService = apiSlice.injectEndpoints({
 
     // Export domains as CSV
     exportDomainsCsv: builder.query({
-      query: () => ({
-        url: "export-domains",
-        method: "GET",
-        responseHandler: async (response) => {
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "domains.csv";
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(url);
-        },
-      }),
+      query: (params) => {
+        // params can be { ids: [1,2,3] } or {}
+        const selected_ids = params?.selected_ids || []; // fallback to empty array
+        const queryString =
+          selected_ids.length > 0
+            ? `?selected_ids=${selected_ids.join(",")}`
+            : "";
+        return {
+          url: `export-domains${queryString}`,
+          method: "GET",
+          responseHandler: (response) => response.blob(),
+        };
+      },
+    }),
+
+    importDomains: builder.mutation({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append("import_file", file);
+
+        return {
+          url: "import-domains",
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: ["Domains"], // optionally refresh the list after import
     }),
 
     // Update domain status (Active / Inactive)
     updateDomainStatus: builder.mutation({
-      query: ({ domainId, status }) => ({
-        url: `update-domain-status/${domainId}`,
-        method: "PATCH",
+      query: ({ id, status }) => ({
+        url: `domains/${id}/status`,
+        method: "PUT",
         body: { status },
       }),
       invalidatesTags: ["Domains"],
@@ -76,4 +99,5 @@ export const {
   useDeleteDomainMutation,
   useUpdateDomainStatusMutation,
   useLazyExportDomainsCsvQuery,
+  useImportDomainsMutation,
 } = adminDomainService;

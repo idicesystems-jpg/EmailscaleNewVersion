@@ -4,7 +4,21 @@ export const adminUserService = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Fetch all users
     fetchUsers: builder.query({
-      query: () => "users",
+      query: (params) => {
+        const queryParams = new URLSearchParams();
+
+        if (params?.page) queryParams.append("page", params.page.toString());
+        if (params?.limit) queryParams.append("limit", params.limit.toString());
+        if (params?.search) queryParams.append("search", params.search);
+
+        return `users?${queryParams.toString()}`;
+      },
+      providesTags: ["Users"],
+    }),
+
+    // New allUsers endpoint
+    allUsers: builder.query({
+      query: () => "all-users",
       providesTags: ["Users"],
     }),
 
@@ -117,5 +131,6 @@ export const {
   useUpdateSubscriptionMutation,
   useUpdateUserMutation,
   useUpdateUserStatusMutation,
-  useLazyExportUsersCsvQuery
+  useLazyExportUsersCsvQuery,
+  useAllUsersQuery,
 } = adminUserService;
