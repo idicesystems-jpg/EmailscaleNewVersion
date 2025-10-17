@@ -23,6 +23,14 @@ export const emailWarmupService = apiSlice.injectEndpoints({
       invalidatesTags: ["EmailWarmup"],
     }),
 
+     deleteEmailAccounts: builder.mutation({
+      query: (id) => ({
+        url: `delete-email-accounts/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["EmailWarmup"],
+    }),
+
     // Bulk delete warmup emails
     bulkDeleteWarmupEmail: builder.mutation({
       query: (ids) => ({
@@ -34,28 +42,39 @@ export const emailWarmupService = apiSlice.injectEndpoints({
     }),
 
     // Export warmup emails as CSV
-    exportWarmupCsv: builder.query({
+    exportWarmupCsv: builder.mutation({
       query: () => ({
         url: "export-email-warmup-csv",
         method: "GET",
-        responseHandler: async (response) => {
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "email-warmup.csv";
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(url);
-        },
+        responseHandler: (response) => response.blob(),
       }),
     }),
 
+
+     exportEmailAccountsCsv: builder.mutation({
+      query: () => ({
+        url: "export-email-accounts",
+        method: "GET",
+        responseHandler: (response) => response.blob(),
+      }),
+    }),
     // Fetch email provider counts
     fetchEmailProviderCounts: builder.query({
       query: () => "email-provider-counts",
       providesTags: ["EmailWarmupCounts"],
+    }),
+
+    saveEmailNew: builder.mutation({
+      query: (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        return {
+          url: "save-email-new",
+          method: "POST",
+          body: formData,
+        };
+      },
     }),
   }),
   overrideExisting: false,
@@ -64,7 +83,10 @@ export const emailWarmupService = apiSlice.injectEndpoints({
 export const {
   useFetchEmailWarmupQuery,
   useDeleteWarmupEmailMutation,
+  useDeleteEmailAccountsMutation,
   useBulkDeleteWarmupEmailMutation,
-  useExportWarmupCsvQuery,
+  useExportWarmupCsvMutation,
   useFetchEmailProviderCountsQuery,
+  useSaveEmailNewMutation,
+  useExportEmailAccountsCsvMutation
 } = emailWarmupService;

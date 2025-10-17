@@ -32,14 +32,16 @@ interface ValidationResult {
 interface BulkUploadWarmupPoolProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  saveEmailNew: any;
 }
 
-export function BulkUploadWarmupPool({ open, onOpenChange, onSuccess }: BulkUploadWarmupPoolProps) {
+export function BulkUploadWarmupPool({ open, onOpenChange,saveEmailNew }: BulkUploadWarmupPoolProps) {
   const [file, setFile] = useState<File | null>(null);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [isValidating, setIsValidating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+
+  console.log("saveEmailNew:", file);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -115,16 +117,16 @@ export function BulkUploadWarmupPool({ open, onOpenChange, onSuccess }: BulkUplo
     if (!selectedFile) return;
 
     setFile(selectedFile);
-    setIsValidating(true);
-    setValidationResults([]);
+    //setIsValidating(true);
+    //setValidationResults([]);
 
-    try {
+    // try {
       const text = await selectedFile.text();
       const lines = text.split('\n').filter(line => line.trim());
       
       if (lines.length === 0) {
         toast.error("File is empty");
-        setIsValidating(false);
+        //setIsValidating(false);
         return;
       }
 
@@ -132,65 +134,67 @@ export function BulkUploadWarmupPool({ open, onOpenChange, onSuccess }: BulkUplo
       const dataLines = lines.slice(1);
       const results: ValidationResult[] = [];
 
-      dataLines.forEach((line, index) => {
-        const columns = line.split('\t').map(col => col.trim());
+      // dataLines.forEach((line, index) => {
+      //   const columns = line.split('\t').map(col => col.trim());
         
-        if (columns.length < 7) {
-          results.push({
-            account: {} as PoolAccount,
-            valid: false,
-            errors: ["Insufficient columns - expected 7 columns (Email, First Name, Last Name, IMAP Username, IMAP Password, IMAP Host, IMAP Port)"],
-            rowNumber: index + 2
-          });
-          return;
-        }
+        // if (columns.length < 7) {
+        //   results.push({
+        //     account: {} as PoolAccount,
+        //     valid: false,
+        //     errors: ["Insufficient columns - expected 7 columns (Email, First Name, Last Name, IMAP Username, IMAP Password, IMAP Host, IMAP Port)"],
+        //     rowNumber: index + 2
+        //   });
+        //   return;
+        // }
 
-        const [email, firstName, lastName, imapUsername, imapPassword, imapHost, imapPort] = columns;
+        //const [email, firstName, lastName, imapUsername, imapPassword, imapHost, imapPort] = columns;
 
-        const result = validateAccount({
-          email_address: email,
-          imap_username: imapUsername,
-          imap_password: imapPassword,
-          imap_host: imapHost,
-          imap_port: Number(imapPort)
-        }, index + 2);
+        // const result = validateAccount({
+        //   email_address: email,
+        //   imap_username: imapUsername,
+        //   imap_password: imapPassword,
+        //   imap_host: imapHost,
+        //   imap_port: Number(imapPort)
+        // }, index + 2);
 
-        results.push(result);
-      });
+        // results.push(result);
+      // });
 
-      setValidationResults(results);
+      //setValidationResults(results);
       
-      const validCount = results.filter(r => r.valid).length;
-      const invalidCount = results.filter(r => !r.valid).length;
+      //const validCount = results.filter(r => r.valid).length;
+      //const invalidCount = results.filter(r => !r.valid).length;
       
-      toast.success(`Validation complete: ${validCount} valid, ${invalidCount} invalid`);
-    } catch (error) {
-      toast.error("Error reading file");
-      console.error(error);
-    } finally {
-      setIsValidating(false);
-    }
+      //toast.success(`Validation complete: ${validCount} valid, ${invalidCount} invalid`);
+    // } catch (error) {
+    //   toast.error("Error reading file");
+    //   console.error(error);
+    // } finally {
+    //   setIsValidating(false);
+    // }
   };
 
   const handleUpload = async () => {
-    const validAccounts = validationResults.filter(r => r.valid).map(r => r.account);
+   // const validAccounts = validationResults.filter(r => r.valid).map(r => r.account);
     
-    if (validAccounts.length === 0) {
-      toast.error("No valid accounts to upload");
-      return;
-    }
+    // if (validAccounts.length === 0) {
+    //   toast.error("No valid accounts to upload");
+    //   return;
+    // }
 
-    setIsUploading(true);
+    //setIsUploading(true);
 
     try {
-      const { error } = await supabase
-        .from('warmup_pool')
-        .insert(validAccounts);
+      // const { error } = await supabase
+      //   .from('warmup_pool')
+      //   .insert(validAccounts);
 
-      if (error) throw error;
+      // if (error) throw error;
 
-      toast.success(`Successfully uploaded ${validAccounts.length} accounts`);
-      onSuccess();
+      await saveEmailNew(file).unwrap(); // <- your RTK Query mutation
+
+      toast.success(`Successfully uploaded accounts`);
+      //onSuccess();
       onOpenChange(false);
       resetState();
     } catch (error: any) {
@@ -206,8 +210,8 @@ export function BulkUploadWarmupPool({ open, onOpenChange, onSuccess }: BulkUplo
     setValidationResults([]);
   };
 
-  const validCount = validationResults.filter(r => r.valid).length;
-  const invalidCount = validationResults.filter(r => !r.valid).length;
+  //const validCount = validationResults.filter(r => r.valid).length;
+  //const invalidCount = validationResults.filter(r => !r.valid).length;
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -237,7 +241,7 @@ export function BulkUploadWarmupPool({ open, onOpenChange, onSuccess }: BulkUplo
             )}
           </div>
 
-          {validationResults.length > 0 && (
+          {/* {validationResults.length > 0 && (
             <>
               <div className="flex gap-4 p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-2">
@@ -306,19 +310,19 @@ export function BulkUploadWarmupPool({ open, onOpenChange, onSuccess }: BulkUplo
                 </Table>
               </ScrollArea>
             </>
-          )}
+          )} */}
 
-          {validationResults.length > 0 && validCount > 0 && (
+          {/* {validationResults.length > 0 && validCount > 0 && ( */}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUploading}>
                 Cancel
               </Button>
               <Button onClick={handleUpload} disabled={isUploading}>
                 <Upload className="h-4 w-4 mr-2" />
-                {isUploading ? 'Uploading...' : `Upload ${validCount} Valid Account${validCount !== 1 ? 's' : ''}`}
+                {isUploading ? 'Uploading...' : `Upload`}
               </Button>
             </div>
-          )}
+          {/* )} */}
         </div>
       </DialogContent>
     </Dialog>
