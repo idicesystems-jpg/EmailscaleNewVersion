@@ -14,6 +14,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { BulkUploadWarmupPool } from "@/components/BulkUploadWarmupPool";
+import {
+  useFetchEmailWarmupQuery,
+  useDeleteWarmupEmailMutation,
+  useBulkDeleteWarmupEmailMutation,
+  useExportWarmupCsvQuery,
+  useFetchEmailProviderCountsQuery,
+} from "../../services/emailWarmupService";
 
 const AdminWarmups = () => {
   // Component for managing warmup accounts and pool
@@ -31,6 +38,26 @@ const AdminWarmups = () => {
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [selectedWarmup, setSelectedWarmup] = useState<any>(null);
   const [selectedUserId, setSelectedUserId] = useState("");
+
+
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState("");
+
+  //fetch users code
+  const { data, error, isLoading } = useFetchEmailWarmupQuery({
+    page,
+    limit,
+    search,
+  });
+
+
+  
+
+  console.log("Fetched warmup data:", data?.data?.warmupData);
+
+
+
   const [currentPage, setCurrentPage] = useState(1);
   const [logsCurrentPage, setLogsCurrentPage] = useState(1);
   const [selectedWarmupRows, setSelectedWarmupRows] = useState<string[]>([]);
@@ -54,41 +81,22 @@ const AdminWarmups = () => {
     fetchUsers();
     fetchWarmupLogs();
     fetchInboxes();
+    setPoolAccounts(data?.data?.campaigns);
   }, []);
 
   const fetchWarmups = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('warmup_accounts')
-      .select(`
-        *,
-        inboxes (email_address),
-        profiles:user_id (full_name, email)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error("Error fetching warmup accounts");
-      console.error(error);
-    } else {
-      setWarmups(data || []);
-    }
+   
+    setWarmups(data?.data?.campaigns || []);
+    
     setLoading(false);
   };
 
   const fetchPoolAccounts = async () => {
     setPoolLoading(true);
-    const { data, error } = await supabase
-      .from('warmup_pool')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error("Error fetching warmup pool");
-      console.error(error);
-    } else {
-      setPoolAccounts(data || []);
-    }
+ 
+    setPoolAccounts(data?.data?.campaigns || []);
+    
     setPoolLoading(false);
   };
 
@@ -305,7 +313,7 @@ const AdminWarmups = () => {
     }
   };
 
-  const totalPoolSends = poolAccounts.reduce((sum, acc) => sum + (acc.total_sends || 0), 0);
+  const totalPoolSends = poolAccounts?.reduce((sum, acc) => sum + (acc?.total_sends || 0), 0);
   const totalPages = Math.ceil(warmups.length / itemsPerPage);
   const paginatedWarmups = warmups.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   
@@ -320,13 +328,14 @@ const AdminWarmups = () => {
   const replyRate = totalReceived > 0 ? ((totalReplied / totalReceived) * 100).toFixed(1) : 0;
 
   // Health status ranges for warmup accounts
-  const healthRanges = {
-    critical: inboxes.filter(i => Number(i.health_score) >= 0 && Number(i.health_score) <= 25).length,
-    poor: inboxes.filter(i => Number(i.health_score) >= 26 && Number(i.health_score) <= 50).length,
-    fair: inboxes.filter(i => Number(i.health_score) >= 51 && Number(i.health_score) <= 75).length,
-    good: inboxes.filter(i => Number(i.health_score) >= 76 && Number(i.health_score) <= 90).length,
-    excellent: inboxes.filter(i => Number(i.health_score) >= 91 && Number(i.health_score) <= 100).length,
-  };
+  const healthRanges = data?.data?.warmupData  || [];
+  // const healthRanges = {
+  //   critical: inboxes.filter(i => Number(i.health_score) >= 0 && Number(i.health_score) <= 25).length,
+  //   poor: inboxes.filter(i => Number(i.health_score) >= 26 && Number(i.health_score) <= 50).length,
+  //   fair: inboxes.filter(i => Number(i.health_score) >= 51 && Number(i.health_score) <= 75).length,
+  //   good: inboxes.filter(i => Number(i.health_score) >= 76 && Number(i.health_score) <= 90).length,
+  //   excellent: inboxes.filter(i => Number(i.health_score) >= 91 && Number(i.health_score) <= 100).length,
+  // };
 
   return (
     <AdminLayout>
@@ -350,7 +359,7 @@ const AdminWarmups = () => {
                   <CardTitle className="text-sm font-medium">Total Pool Accounts</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-primary">{poolAccounts.length}</div>
+                  <div className="text-2xl font-bold text-primary">{poolAccounts?.length}</div>
                 </CardContent>
               </Card>
               <Card>
@@ -359,7 +368,7 @@ const AdminWarmups = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-primary">
-                    {poolAccounts.filter(a => a.status === 'active').length}
+                    {poolAccounts?.filter(a => a.status === 'active').length}
                   </div>
                 </CardContent>
               </Card>
@@ -553,19 +562,19 @@ const AdminWarmups = () => {
                               }}
                             />
                           </TableCell>
-                          <TableCell className="font-medium">{account.email_address}</TableCell>
-                          <TableCell className="capitalize">{account.provider}</TableCell>
+                          <TableCell className="font-medium">{account.smtp_username}</TableCell>
+                          <TableCell className="capitalize">{account.email_provider}</TableCell>
                           <TableCell>
                             <span className={`px-2 py-1 rounded text-xs ${
-                              account.status === 'active' ? 'bg-green-500/20 text-green-500' :
-                              account.status === 'inactive' ? 'bg-gray-500/20 text-gray-500' :
+                              account.warmup_enabled === 'TRUE' ? 'bg-green-500/20 text-green-500' :
+                              account.warmup_enabled === 'FALSE' ? 'bg-gray-500/20 text-gray-500' :
                               'bg-red-500/20 text-red-500'
                             }`}>
-                              {account.status}
+                              {account.warmup_enabled?"Active":"Inactive"}
                             </span>
                           </TableCell>
-                          <TableCell>{account.daily_sends}</TableCell>
-                          <TableCell>{account.total_sends}</TableCell>
+                          <TableCell>{account.daily_volume}</TableCell>
+                          <TableCell>{account.total_email}</TableCell>
                           <TableCell>
                             {account.last_send_at ? new Date(account.last_send_at).toLocaleDateString() : '—'}
                           </TableCell>
@@ -598,7 +607,7 @@ const AdminWarmups = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-red-500">{healthRanges.critical}</div>
+                  <div className="text-2xl font-bold text-red-500">{healthRanges.warmup1}</div>
                   <p className="text-xs text-muted-foreground mt-1">Needs immediate attention</p>
                 </CardContent>
               </Card>
@@ -610,7 +619,7 @@ const AdminWarmups = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-orange-500">{healthRanges.poor}</div>
+                  <div className="text-2xl font-bold text-orange-500">{healthRanges.warmup2}</div>
                   <p className="text-xs text-muted-foreground mt-1">Requires monitoring</p>
                 </CardContent>
               </Card>
@@ -622,7 +631,7 @@ const AdminWarmups = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-yellow-500">{healthRanges.fair}</div>
+                  <div className="text-2xl font-bold text-yellow-500">{healthRanges.warmup3}</div>
                   <p className="text-xs text-muted-foreground mt-1">Moderate health</p>
                 </CardContent>
               </Card>
@@ -634,7 +643,7 @@ const AdminWarmups = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-blue-500">{healthRanges.good}</div>
+                  <div className="text-2xl font-bold text-blue-500">{healthRanges.warmup4}</div>
                   <p className="text-xs text-muted-foreground mt-1">Healthy status</p>
                 </CardContent>
               </Card>
@@ -646,7 +655,7 @@ const AdminWarmups = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-500">{healthRanges.excellent}</div>
+                  <div className="text-2xl font-bold text-green-500">{healthRanges.warmup5}</div>
                   <p className="text-xs text-muted-foreground mt-1">Optimal performance</p>
                 </CardContent>
               </Card>
@@ -719,25 +728,25 @@ const AdminWarmups = () => {
                               />
                             </TableCell>
                             <TableCell className="font-medium">
-                              {warmup.inboxes?.email_address || "—"}
+                              {warmup?.smtp_username || "—"}
                             </TableCell>
                             <TableCell>
-                              {warmup.profiles?.full_name || warmup.profiles?.email || "—"}
+                              {warmup.first_name + "  " + warmup?.last_name || "—"}
                             </TableCell>
                             <TableCell>
                               <span className={`px-2 py-1 rounded text-xs ${
-                                warmup.warmup_status === 'active' ? 'bg-green-500/20 text-green-500' :
-                                warmup.warmup_status === 'paused' ? 'bg-orange-500/20 text-orange-500' :
+                                warmup.warmup_status === 'TRUE' ? 'bg-green-500/20 text-green-500' :
+                                warmup.warmup_status === 'FALSE' ? 'bg-orange-500/20 text-orange-500' :
                                 'bg-blue-500/20 text-blue-500'
                               }`}>
-                                {warmup.warmup_status}
+                                {warmup.warmup_enabled?"Active":"Paused"}
                               </span>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <Progress value={Number(warmup.progress_percentage)} className="w-20 h-2" />
+                                <Progress value={Number(warmup.health_score)} className="w-20 h-2" />
                                 <span className="text-xs text-muted-foreground">
-                                  {warmup.progress_percentage}%
+                                  {warmup.health_score}%
                                 </span>
                               </div>
                             </TableCell>
