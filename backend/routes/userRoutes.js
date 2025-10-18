@@ -53,13 +53,21 @@ const {
   getReplies,
   getUserTickets,
   closeTicket,
+  rateTicket,
+  deleteTicket,
+  getUnreadCount,
+  getNotificationsByEmail,
+  markNotificationsRead,
 } = require("../controllers/ticketController");
+
+const { addNote, getNotes, updateNote, deleteNote} = require("../controllers/notesController");
+
 // Routes
 router.post("/login", login);
 
 router.use(authenticateToken);
 
-router.post("/register", register);
+router.post("/register",authenticateToken, register);
 router.get("/users", getUsers);
 router.get("/all-users", getUsersWithoutPagination);
 router.put("/update-user/:id", updateUser);
@@ -101,9 +109,22 @@ router.get("/all-tickets", upload.single("file"), getAllTickets);
 router.get("/getTicketDetailById/:id", getTicketDetailById);
 router.post("/reply", upload.single("file"), replyTicket);
 router.get("/replies/:id", getReplies);
-
 // logged in user tickets.
 router.get("/user-tickets", getUserTickets);
 router.post("/close/:id", closeTicket);
+router.post("/rate/:id", rateTicket);
+router.delete("/delete/:id", deleteTicket);
+router.get("/notifications/unread-count/:email", getUnreadCount);
+router.get("/notifications/:email", getNotificationsByEmail);
+router.post("/notifications/mark-read/:email", markNotificationsRead);
+
+// notesController routes
+router.post("/ticket-notes/:ticketId", addNote);
+router.get("/all-notes/:ticketId",getNotes);
+router.put("/update-notes/:noteId",updateNote);
+router.delete("/delete/:noteId",deleteNote);
+
+
+
 
 module.exports = router;
