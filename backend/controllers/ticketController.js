@@ -246,7 +246,15 @@ const createTicket = async (req, res) => {
     const file = req.file ? req.file.filename : null;
 
     // Determine the target user (admin can create for others)
+    // const userId = req.user.role_id === 1 && user_id ? user_id : req.user.id;
+    // const userId = req.user.role_id === 1 && req.body.user_id ? req.body.user_id : req.user.id;
     const userId = req.user.role_id === 1 && user_id ? user_id : req.user.id;
+
+   console.log("Logged-in user:", req.user); // { id: 270, role_id: 1, iat: ..., exp: ... }
+console.log("Body user_id:", user_id);    // 273
+console.log("Target userId:", userId);
+console.log("Logged-in role:", req.user.role_id);
+
 
     //  Create ticket record
     const newTicket = await Ticket.create({
@@ -777,4 +785,163 @@ const closeTicket = async (req, res) => {
   }
 };
 
-module.exports = {createTicket, getAllTickets, getTicketDetailById, replyTicket, getReplies, getUserTickets, closeTicket }
+const rateTicket = async (req, res) => {
+  const ticketId = req.params.id;
+  const { rating, feedback } = req.body;
+
+  try {
+    // Find the ticket and ensure it's closed
+    const ticket = await Ticket.findOne({
+      where: { id: ticketId, status: 'closed' }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket not found or not closed" });
+    }
+
+    // Update rating & feedback
+    ticket.rating = rating;
+    ticket.feedback = feedback;
+    await ticket.save();
+
+    res.json({ message: "Thank you for your feedback!" });
+  } catch (error) {
+    console.error(' rateTicket error:', error);
+    res.status(500).json({ message: "Failed to save rating", error: error.message });
+  }
+};
+
+const deleteTicket = async (req, res) => {
+  const ticketId = req.params.id;
+
+  try {
+    // Find the ticket
+    const ticket = await Ticket.findOne({
+      where: { id: ticketId },
+      include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email', 'role_id'] }]
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    // Soft delete
+    ticket.status = 'delete';
+    await ticket.save();
+
+    const userEmail = ticket.user.email;
+    const userName = ticket.user.name || "User";
+    const subject = ticket.subject;
+
+    //  User email content
+    const userContent = `
+      <h2>🧹 Ticket Deleted for System Tidiness</h2>
+      <p>Hi ${userName},</p>
+      <p>Don’t panic — we’ve deleted your ticket from our system to keep things clean and organised.</p>
+      <p>This doesn’t affect your support in any way. If you need help again in the future, you can always open a new ticket.</p>
+      <p>Best,</p>
+      <p><strong>The Support Team</strong></p>
+    `;
+
+    //  Admin email content
+    const adminContent = `
+      <p>Your ticket <strong>#${ticketId}</strong> (<em>${subject}</em>) has been deleted.</p>
+      <p>If you did not request this action, please contact support immediately.</p>
+    `;
+
+    const userHtml = emailTemplate("Ticket Deleted", userContent);
+    const adminHtml = emailTemplate("Ticket Deleted", adminContent);
+
+    const mailOptions = {
+      from: `"Ticket System" <${process.env.SMTP_USER}>`,
+      subject: `Ticket Deleted: #${ticketId}`,
+      bcc: "nikhil02.1998@gmail.com",
+    };
+
+    // Send email to user
+    transporter.sendMail({ ...mailOptions, to: userEmail, html: userHtml }, (errU) => {
+      if (errU) console.error(" Failed to email user:", errU.message);
+      else console.log(" Ticket deleted email sent to user");
+    });
+
+    // Send email to admin
+    transporter.sendMail({ ...mailOptions, to: process.env.SMTP_USER, html: adminHtml }, (errA) => {
+      if (errA) console.error(" Failed to email admin:", errA.message);
+      else console.log(" Ticket deleted email sent to admin");
+    });
+
+    res.json({ message: "Ticket deleted and both notified" });
+
+  } catch (error) {
+    console.error(' deleteTicket error:', error);
+    res.status(500).json({ message: "Failed to delete ticket", error: error.message });
+  }
+};
+
+const getUnreadCount = async (req, res) => {
+  const { email } = req.params;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  try {
+    const count = await Notification.count({
+      where: {
+        email,
+        is_read: 0
+      }
+    });
+
+    res.json({ count });
+  } catch (error) {
+    console.error(" getUnreadCount error:", error);
+    res.status(500).json({ message: "Error fetching count", error: error.message });
+  }
+};
+
+const getNotificationsByEmail = async (req, res) => {
+  const { email } = req.params;
+
+  if (!email) return res.status(400).json({ message: "Email is required" });
+
+  try {
+    const notifications = await Notification.findAll({
+      where: { email },
+      order: [['created_at', 'DESC']],
+      attributes: ['id', 'user_id', 'email', 'ticket_id', 'type', 'message', 'is_read', 'created_at']
+    });
+
+    res.json({ notifications });
+  } catch (error) {
+    console.error(" getNotificationsByEmail error:", error);
+    res.status(500).json({ message: "Failed to fetch notifications", error: error.message });
+  }
+};
+
+const markNotificationsRead = async (req, res) => {
+  const email = req.params.email;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  try {
+    await Notification.update(
+      { is_read: 1 },
+      { where: { email } }
+    );
+
+    res.json({ message: "Notifications marked as read" });
+  } catch (error) {
+    console.error("Error marking notifications read:", error);
+    res.status(500).json({
+      message: "Failed to mark notifications as read",
+      error: error.message,
+    });
+  }
+};
+
+
+
+module.exports = {createTicket, getAllTickets, getTicketDetailById, replyTicket, getReplies, getUserTickets, closeTicket, rateTicket, deleteTicket, getUnreadCount, getNotificationsByEmail, markNotificationsRead }
