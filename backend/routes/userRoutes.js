@@ -84,4 +84,5 @@ router.get('/export-email-warmup-csv', exportWarmupCsv);
 //EmailAccounts routes.
 router.post('/save-email-new', saveEmailNew);
 router.delete('/delete-email-accounts/:id', deleteEmailAccount);
+
 module.exports = router;
