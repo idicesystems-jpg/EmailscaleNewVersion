@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
 const router = express.Router();
-const authenticateToken = require('../middlewares/authMiddleware');
+const authenticateToken = require("../middlewares/authMiddleware");
 const {
   login,
   register,
@@ -38,11 +38,22 @@ const {
   deleteWarmupEmail,
   bulkDeleteWarmupEmail,
   exportEmailAccounts,
-  exportWarmupCsv
+  exportWarmupCsv,
 } = require("../controllers/emailWarmupController");
 
-
-const { saveEmailNew, deleteEmailAccount } = require('../controllers/EmailAccountsController');
+const {
+  saveEmailNew,
+  deleteEmailAccount,
+} = require("../controllers/EmailAccountsController");
+const {
+  createTicket,
+  getAllTickets,
+  getTicketDetailById,
+  replyTicket,
+  getReplies,
+  getUserTickets,
+  closeTicket,
+} = require("../controllers/ticketController");
 // Routes
 router.post("/login", login);
 
@@ -77,11 +88,22 @@ router.get("/email-provider-counts", getEmailProviderCounts);
 router.get("/email-warmup", emailWarmup);
 router.delete("/email-warmup/:id", deleteWarmupEmail);
 router.post("/bulk-delete-warmup-email", bulkDeleteWarmupEmail);
-router.get('/export-email-accounts', exportEmailAccounts);
-router.get('/export-email-warmup-csv', exportWarmupCsv);
-
+router.get("/export-email-accounts", exportEmailAccounts);
+router.get("/export-email-warmup-csv", exportWarmupCsv);
 
 //EmailAccounts routes.
-router.post('/save-email-new', saveEmailNew);
-router.delete('/delete-email-accounts/:id', deleteEmailAccount);
+router.post("/save-email-new", saveEmailNew);
+router.delete("/delete-email-accounts/:id", deleteEmailAccount);
+
+//Tickets controller routes.
+router.post("/create-ticket", upload.single("file"), createTicket);
+router.get("/all-tickets", upload.single("file"), getAllTickets);
+router.get("/getTicketDetailById/:id", getTicketDetailById);
+router.post("/reply", upload.single("file"), replyTicket);
+router.get("/replies/:id", getReplies);
+
+// logged in user tickets.
+router.get("/user-tickets", getUserTickets);
+router.post("/close/:id", closeTicket);
+
 module.exports = router;

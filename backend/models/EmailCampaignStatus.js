@@ -69,9 +69,8 @@ const sequelize = require('../config/database');
   //  Relationship (matches Laravel: belongsTo Campaign)
   EmailCampaignStatus.associate = (models) => {
     EmailCampaignStatus.belongsTo(models.Campaign, {
-      foreignKey: "campaign_id",
-      targetKey: "id", // Campaign's id field
-      as: "campaign",
+      foreignKey: 'campaign_id',
+      as: 'campaign',
     });
   };
 

@@ -114,5 +114,10 @@ const User = sequelize.define('User', {
   updatedAt: 'updated_at' 
 });
 
+// User.hasMany(require('./Ticket'), {
+//   foreignKey: 'user_id',
+//   as: 'tickets'
+// });
+
 
 module.exports = User;
