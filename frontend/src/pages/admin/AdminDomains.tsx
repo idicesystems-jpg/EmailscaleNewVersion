@@ -250,7 +250,7 @@ const AdminDomains = () => {
 
   const [exportDomainsCsv, { isFetching }] = useLazyExportDomainsCsvQuery();
   const [selectedIds, setSelectedIds] = useState([]);
-  console.log("selectedIds", selectedIds);
+  //console.log("selectedIds", selectedIds);
   const handleExportDomainsCsv = async () => {
     try {
       // If selectedIds is empty, backend should export all
