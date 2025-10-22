@@ -2,7 +2,6 @@ import { apiSlice } from "./apiSlice";
 
 export const ticketService = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-
     // Create a new support ticket
     createTicket: builder.mutation({
       query: (formData) => ({
@@ -17,6 +16,20 @@ export const ticketService = apiSlice.injectEndpoints({
     getAllTickets: builder.query({
       query: () => "all-tickets",
       providesTags: ["Tickets"],
+    }),
+
+    getAllNotesByTicketId: builder.query({
+      query: (ticketId) => `all-notes/${ticketId}`,
+      providesTags: ["Notes"],
+    }),
+
+    addTicketNote: builder.mutation({
+      query: ({ ticketId, note }) => ({
+        url: `ticket-notes/${ticketId}`,
+        method: "POST",
+        body: { note },
+      }),
+      invalidatesTags: ["TicketNotes"],
     }),
 
     // Get ticket detail by ID
@@ -55,7 +68,6 @@ export const ticketService = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Tickets"],
     }),
-
   }),
   overrideExisting: false,
 });
@@ -68,4 +80,6 @@ export const {
   useGetRepliesQuery,
   useGetUserTicketsQuery,
   useCloseTicketMutation,
+  useGetAllNotesByTicketIdQuery,
+  useAddTicketNoteMutation
 } = ticketService;

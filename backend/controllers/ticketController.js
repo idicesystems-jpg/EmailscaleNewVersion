@@ -244,18 +244,7 @@ const createTicket = async (req, res) => {
     const { subject, message, priority, user_id } = req.body;
     const createdBy = req.user.id;
     const file = req.file ? req.file.filename : null;
-
-    console.log("req.user", req.user);
-
-    // Determine the target user (admin can create for others)
-    // const userId = req.user.role_id === 1 && user_id ? user_id : req.user.id;
-    // const userId = req.user.role_id === 1 && req.body.user_id ? req.body.user_id : req.user.id;
     const userId = req.user.role_id === 1 && user_id ? user_id : req.user.id;
-
-    console.log("Logged-in user:", req.user); // { id: 270, role_id: 1, iat: ..., exp: ... }
-    console.log("Body user_id:", user_id); // 273
-    console.log("Target userId:", userId);
-    console.log("Logged-in role:", req.user.role_id);
 
     //  Create ticket record
     const newTicket = await Ticket.create({

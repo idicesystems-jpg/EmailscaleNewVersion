@@ -46,6 +46,8 @@ import {
   useGetRepliesQuery,
   useGetUserTicketsQuery,
   useCloseTicketMutation,
+  useGetAllNotesByTicketIdQuery,
+  useAddTicketNoteMutation
 } from "@/services/ticketService";
 import { useAllUsersQuery } from "../../services/adminUserService";
 import { useSelector } from "react-redux";
@@ -55,7 +57,7 @@ const AdminSupport = () => {
     (state: any) => state.auth
   );
 
-  const isAdmin = user?.user?.role_id == 1;
+  const isAdmin = user?.role_id == 1;
 
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -64,14 +66,13 @@ const AdminSupport = () => {
   const [ticketNotes, setTicketNotes] = useState<any[]>([]);
   const [newNote, setNewNote] = useState("");
   const [file, setFile] = useState(null);
+  const [ticketId, setTicketId] = useState(null);
   const [newTicket, setNewTicket] = useState({
     user_id: "",
     subject: "",
     message: "",
     priority: "medium",
   });
-
-  console.log("newTicket", newTicket);
 
   const { data, isLoading } = useGetAllTicketsQuery();
   const tickets = data?.data || [];
@@ -156,37 +157,29 @@ const AdminSupport = () => {
     }
   };
 
+
+  const [addTicketNote] = useAddTicketNoteMutation();
+  
   const handleAddNote = async () => {
+    //console.log(selectedTicket.id, newNote);
     if (!newNote.trim() || !selectedTicket) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase.from("ticket_notes").insert([
-      {
-        ticket_id: selectedTicket.id,
-        admin_id: user.id,
-        note: newNote,
-      },
-    ]);
-
-    if (error) {
-      toast.error("Error adding note");
-      console.error(error);
-    } else {
-      toast.success("Note added");
-      setNewNote("");
-      fetchTicketNotes(selectedTicket.id);
+    try {
+      const newticketId = selectedTicket.id;
+      await addTicketNote({ticketId:newticketId,note:newNote}).unwrap();
+      toast.success("Note added successfully!");
+    } catch (error) {
+      toast.error("Failed to add note");
     }
   };
 
-  const [notes, setNotes] = useState([]);
+  
+  const { data:notes} = useGetAllNotesByTicketIdQuery(ticketId);
   const handleViewTicket = async (ticket: any) => {
-    console.log("Viewing ticket:", ticket);
+    
+    setTicketNotes(notes?.notes || []);
+    console.log("Viewing notes:", notes?.notes);
     setSelectedTicket(ticket);
-    await fetchTicketNotes(ticket.id);
+    //await fetchTicketNotes(ticket.id);
     setDetailsDialogOpen(true);
   };
 
@@ -372,7 +365,6 @@ const AdminSupport = () => {
                       </Select>
                     </div>
                     <div>
-                      <Label>File upload</Label>
                       <input
                         type="file"
                         className="form-control mb-2"
@@ -423,7 +415,9 @@ const AdminSupport = () => {
                       </TableCell>
                       <TableCell
                         className="max-w-md truncate"
-                        onClick={() => handleViewTicket(ticket)}
+                        onClick={() => {handleViewTicket(ticket);
+                          setTicketId(ticket.id);
+                        }}
                       >
                         {ticket.subject}
                       </TableCell>

@@ -25,6 +25,7 @@ const addNote = async (req, res) => {
   }
 };
 
+
 const getNotes = async (req, res) => {
   try {
     const ticketId = req.params.ticketId;
