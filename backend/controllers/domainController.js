@@ -9,6 +9,7 @@ const dayjs = require("dayjs");
 const fs = require("fs");
 const csv = require("csv-parser");
 const { Parser } = require("json2csv");
+const namecheapService = require("../services/namecheapService");
 
 const saveDomainAndUser = async (req, res) => {
   try {
@@ -681,6 +682,71 @@ const exportDomainsCsv = async (req, res) => {
   }
 };
 
+const checkAlternateDomainAvailability = async (req, res) => {
+  try {
+    // 1️⃣ Validate inputs (similar to Laravel validation)
+    const { domain_name, count } = req.body;
+
+    if (!domain_name || typeof domain_name !== 'string' || domain_name.length > 255) {
+      return res.status(422).json({
+        status: false,
+        message: 'Domain name is required and must be a string up to 255 characters.',
+        error: 'Validation Error',
+        data: [],
+      });
+    }
+
+    if (count && (isNaN(count) || count < 1 || count > 50)) {
+      return res.status(422).json({
+        status: false,
+        message: 'Count must be an integer between 1 and 50.',
+        error: 'Validation Error',
+        data: [],
+      });
+    }
+
+    // 2️⃣ Extract values
+    const domainName = domain_name;
+    const domainCount = count || 1; // Default = 1
+
+    // 3️⃣ Call your Namecheap service
+    // Assuming you have imported it like:
+    // const namecheapService = require('../services/namecheapService');
+    const result = await namecheapService.searchAlternateDomains(domainName, domainCount);
+
+    // 4️⃣ Return response same as Laravel
+    return res.status(200).json(result);
+
+  } catch (error) {
+    console.error('Error checking alternate domains:', error.message);
+    return res.status(500).json({
+      status: false,
+      message: error.message || 'Something went wrong',
+    });
+  }
+};
+
+const checkDomainAvailability = async (req, res) => {
+  try {
+    // Get domains from request body (like Laravel's $request->input('result'))
+    const domains = req.body.result;
+
+    if (!domains || domains.length === 0) {
+      return res.status(400).json({ status: false, message: 'result field is required' });
+    }
+
+    // Call the Namecheap service
+    const result = await namecheapService.searchDomains(domains);
+
+    // Return the result as JSON
+    return res.json(result);
+  } catch (error) {
+    console.error('Error checking domain availability:', error);
+    return res.status(500).json({ status: false, message: error.message });
+  }
+};
+
+
 module.exports = {
   saveDomainAndUser,
   getUserDomains,
@@ -689,4 +755,6 @@ module.exports = {
   updateDomainStatus,
   destroyDomain,
   exportDomainsCsv,
+  checkAlternateDomainAvailability,
+  checkDomainAvailability
 };

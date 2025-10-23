@@ -1,9 +1,9 @@
-const { Op } = require('sequelize');
-const Ticket = require('../models/Ticket');
-const User = require('../models/User'); // assuming you have this model
-const Reply = require('../models/Reply'); // if you have replies table
-const Notification = require('../models/Notification'); // if notifications table exists
-const nodemailer = require('nodemailer');
+const { Op } = require("sequelize");
+const Ticket = require("../models/Ticket");
+const User = require("../models/User"); // assuming you have this model
+const Reply = require("../models/Reply"); // if you have replies table
+const Notification = require("../models/Notification"); // if notifications table exists
+const nodemailer = require("nodemailer");
 const GHL_API_KEY = process.env.GHL_API_KEY;
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -250,11 +250,10 @@ const createTicket = async (req, res) => {
     // const userId = req.user.role_id === 1 && req.body.user_id ? req.body.user_id : req.user.id;
     const userId = req.user.role_id === 1 && user_id ? user_id : req.user.id;
 
-   console.log("Logged-in user:", req.user); // { id: 270, role_id: 1, iat: ..., exp: ... }
-console.log("Body user_id:", user_id);    // 273
-console.log("Target userId:", userId);
-console.log("Logged-in role:", req.user.role_id);
-
+    console.log("Logged-in user:", req.user); // { id: 270, role_id: 1, iat: ..., exp: ... }
+    console.log("Body user_id:", user_id); // 273
+    console.log("Target userId:", userId);
+    console.log("Logged-in role:", req.user.role_id);
 
     //  Create ticket record
     const newTicket = await Ticket.create({
@@ -263,7 +262,7 @@ console.log("Logged-in role:", req.user.role_id);
       subject,
       message,
       priority,
-      file
+      file,
     });
 
     //  Create first reply
@@ -272,14 +271,16 @@ console.log("Logged-in role:", req.user.role_id);
         ticket_id: newTicket.id,
         user_id: userId,
         message,
-        file
+        file,
       });
     }
 
     //  Fetch user info
-    const user = await User.findByPk(userId, { attributes: ['id', 'email', 'name', 'role_id'] });
+    const user = await User.findByPk(userId, {
+      attributes: ["id", "email", "name", "role_id"],
+    });
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     const userEmail = user.email;
@@ -289,9 +290,9 @@ console.log("Logged-in role:", req.user.role_id);
     const admins = await User.findAll({
       where: {
         role_id: 1,
-        id: { [Op.ne]: userId }
+        id: { [Op.ne]: userId },
       },
-      attributes: ['id', 'email']
+      attributes: ["id", "email"],
     });
 
     //  Create notifications for all admins
@@ -300,9 +301,9 @@ console.log("Logged-in role:", req.user.role_id);
         user_id: admin.id,
         email: admin.email,
         ticket_id: newTicket.id,
-        type: 'ticket_created',
+        type: "ticket_created",
         message: `${userName} created a new ticket #${newTicket.id}: ${subject}`,
-        is_read: 0
+        is_read: 0,
       });
     }
 
@@ -311,12 +312,12 @@ console.log("Logged-in role:", req.user.role_id);
       user_id: userId,
       email: userEmail,
       ticket_id: newTicket.id,
-      type: 'ticket_created',
+      type: "ticket_created",
       message:
         req.user.role_id === 1
           ? `Admin created a new ticket #${newTicket.id} for you: ${subject}`
           : `Your ticket #${newTicket.id} has been created successfully: ${subject}`,
-      is_read: 0
+      is_read: 0,
     });
 
     //  Prepare email content
@@ -356,49 +357,55 @@ console.log("Logged-in role:", req.user.role_id);
       secure: false,
       auth: {
         user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
+        pass: process.env.SMTP_PASS,
+      },
     });
 
     //  Send admin email
     await transporter.sendMail({
       from: `"Ticket System" <${process.env.SMTP_USER}>`,
       to: process.env.SMTP_USER,
-      bcc: 'nikhil02.1998@gmail.com',
+      bcc: "nikhil02.1998@gmail.com",
       subject: `New Ticket #${ticketId}: ${subject}`,
-      html: emailTemplate('New Ticket Submitted', adminContent, bottomHtml)
+      html: emailTemplate("New Ticket Submitted", adminContent, bottomHtml),
     });
 
     //  Send user confirmation email
     await transporter.sendMail({
       from: `"Ticket System" <${process.env.SMTP_USER}>`,
       to: userEmail,
-      bcc: 'umasharma0821@gmail.com',
+      bcc: "umasharma0821@gmail.com",
       subject: `Ticket Received: #${ticketId}`,
-      html: emailTemplate('Ticket Confirmation', userContent, bottomHtml)
+      html: emailTemplate("Ticket Confirmation", userContent, bottomHtml),
     });
 
     //  Sync with GHL (if applicable)
-    const ghlResult = await syncTicketToGHL(userEmail, ticketId, subject, message, priority);
+    const ghlResult = await syncTicketToGHL(
+      userEmail,
+      ticketId,
+      subject,
+      message,
+      priority
+    );
     if (!ghlResult.success) {
       return res.status(500).json({
-        message: 'Ticket created locally but failed to sync with GHL',
+        message: "Ticket created locally but failed to sync with GHL",
         ticket_id: ticketId,
-        ghl_error: ghlResult.error
+        ghl_error: ghlResult.error,
       });
     }
 
     return res.json({
       status: true,
-      message: 'Ticket created and synced to GHL',
+      message: "Ticket created and synced to GHL",
       ticket_id: ticketId,
-      ghl_ticket_id: ghlResult.ticketId
+      ghl_ticket_id: ghlResult.ticketId,
     });
   } catch (error) {
-    console.error('Error creating ticket:', error);
+    console.error("Error creating ticket:", error);
     return res.status(500).json({
       status: false,
-      message: 'Server error: ' + error.message
+      message: "Server error: " + error.message,
     });
   }
 };
@@ -408,7 +415,7 @@ const getAllTickets = async (req, res) => {
     const { status, priority, page = 1, limit = 10 } = req.query;
 
     const whereClause = {
-      status: { [Op.ne]: 'delete' } // exclude deleted tickets
+      status: { [Op.ne]: "delete" }, // exclude deleted tickets
     };
 
     if (status) {
@@ -427,32 +434,32 @@ const getAllTickets = async (req, res) => {
       include: [
         {
           model: User,
-          as: 'user',
-          attributes: ['id', 'name']
-        }
+          as: "user",
+          attributes: ["id", "name"],
+        },
       ],
-      order: [['created_at', 'DESC']],
+      order: [["created_at", "DESC"]],
       limit: parseInt(limit),
-      offset: offset
+      offset: offset,
     });
 
     return res.status(200).json({
       status: true,
-      message: 'Tickets fetched successfully.',
+      message: "Tickets fetched successfully.",
       data: rows,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total: count,
-        totalPages: Math.ceil(count / parseInt(limit))
-      }
+        totalPages: Math.ceil(count / parseInt(limit)),
+      },
     });
   } catch (error) {
-    console.error('Error fetching tickets:', error);
+    console.error("Error fetching tickets:", error);
     return res.status(500).json({
       status: false,
-      message: 'Error fetching tickets',
-      error: error.message
+      message: "Error fetching tickets",
+      error: error.message,
     });
   }
 };
@@ -640,17 +647,19 @@ const getReplies = async (req, res) => {
       include: [
         {
           model: User,
-          as: 'user',
-          attributes: ['id', 'name'], // only fetch id and name
+          as: "user",
+          attributes: ["id", "name"], // only fetch id and name
         },
       ],
-      order: [['created_at', 'ASC']], // ascending order by created_at
+      order: [["created_at", "ASC"]], // ascending order by created_at
     });
 
     res.json(replies);
   } catch (error) {
-    console.error('Error fetching replies:', error);
-    res.status(500).json({ message: "Error fetching replies", error: error.message });
+    console.error("Error fetching replies:", error);
+    res
+      .status(500)
+      .json({ message: "Error fetching replies", error: error.message });
   }
 };
 
@@ -662,7 +671,7 @@ const getUserTickets = async (req, res) => {
     // Build query conditions
     const where = {
       user_id: userId,
-      status: { [Op.ne]: 'delete' }, // exclude deleted tickets
+      status: { [Op.ne]: "delete" }, // exclude deleted tickets
     };
 
     if (status) where.status = status;
@@ -671,14 +680,14 @@ const getUserTickets = async (req, res) => {
     // Fetch tickets with pagination
     const { count: total, rows: tickets } = await Ticket.findAndCountAll({
       where,
-      order: [['created_at', 'DESC']],
+      order: [["created_at", "DESC"]],
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit),
       include: [
         {
           model: User,
-          as: 'user',
-          attributes: ['id', 'name', 'email'],
+          as: "user",
+          attributes: ["id", "name", "email"],
         },
       ],
     });
@@ -693,8 +702,10 @@ const getUserTickets = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching user tickets:', error);
-    res.status(500).json({ message: 'Error fetching tickets', error: error.message });
+    console.error("Error fetching user tickets:", error);
+    res
+      .status(500)
+      .json({ message: "Error fetching tickets", error: error.message });
   }
 };
 const closeTicket = async (req, res) => {
@@ -703,14 +714,14 @@ const closeTicket = async (req, res) => {
   try {
     // 1️ Update ticket status
     const ticket = await Ticket.findOne({ where: { id: ticketId } });
-    if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
-    ticket.status = 'closed';
+    ticket.status = "closed";
     await ticket.save();
 
     // 2️ Fetch user details
     const user = await User.findByPk(ticket.user_id);
-    const userName = user?.name || 'User';
+    const userName = user?.name || "User";
     const userEmail = user?.email;
 
     // 3️ Prepare email content
@@ -730,20 +741,34 @@ const closeTicket = async (req, res) => {
     const mailOptions = {
       from: `"Ticket System" <${process.env.SMTP_USER}>`,
       subject: `Ticket Closed: #${ticketId}`,
-      bcc: 'nikhil02.1998@gmail.com',
+      bcc: "nikhil02.1998@gmail.com",
     };
 
     if (userEmail) {
-      transporter.sendMail({ ...mailOptions, to: userEmail, html: emailTemplate('Ticket Closed', userContent) }, (errU) => {
-        if (errU) console.error('Failed to email user:', errU.message);
-        else console.log(' Ticket closed email sent to user');
-      });
+      transporter.sendMail(
+        {
+          ...mailOptions,
+          to: userEmail,
+          html: emailTemplate("Ticket Closed", userContent),
+        },
+        (errU) => {
+          if (errU) console.error("Failed to email user:", errU.message);
+          else console.log(" Ticket closed email sent to user");
+        }
+      );
     }
 
-    transporter.sendMail({ ...mailOptions, to: process.env.SMTP_USER, html: emailTemplate('Ticket Closed', adminContent) }, (errA) => {
-      if (errA) console.error(' Failed to email admin:', errA.message);
-      else console.log(' Ticket closed email sent to admin');
-    });
+    transporter.sendMail(
+      {
+        ...mailOptions,
+        to: process.env.SMTP_USER,
+        html: emailTemplate("Ticket Closed", adminContent),
+      },
+      (errA) => {
+        if (errA) console.error(" Failed to email admin:", errA.message);
+        else console.log(" Ticket closed email sent to admin");
+      }
+    );
 
     // 5️⃣ Notifications
     if (userEmail) {
@@ -751,7 +776,7 @@ const closeTicket = async (req, res) => {
         user_id: ticket.user_id,
         email: userEmail,
         ticket_id: ticketId,
-        type: 'ticket_closed',
+        type: "ticket_closed",
         message: `Your ticket #${ticketId} has been closed.`,
         is_read: 0,
       });
@@ -763,7 +788,7 @@ const closeTicket = async (req, res) => {
       user_id: admin.id,
       email: admin.email,
       ticket_id: ticketId,
-      type: 'ticket_closed',
+      type: "ticket_closed",
       message: `Ticket #${ticketId} has been closed by system`,
       is_read: 0,
     }));
@@ -775,13 +800,15 @@ const closeTicket = async (req, res) => {
     const ghlResult = await removeTicketFromGHL(userEmail, ticketId);
 
     res.json({
-      message: 'Ticket closed, all notified, GHL tags removed',
+      message: "Ticket closed, all notified, GHL tags removed",
       ticketId,
       ghlResult,
     });
   } catch (error) {
-    console.error(' closeTicket error:', error);
-    res.status(500).json({ message: 'Failed to close ticket', error: error.message });
+    console.error(" closeTicket error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to close ticket", error: error.message });
   }
 };
 
@@ -792,11 +819,13 @@ const rateTicket = async (req, res) => {
   try {
     // Find the ticket and ensure it's closed
     const ticket = await Ticket.findOne({
-      where: { id: ticketId, status: 'closed' }
+      where: { id: ticketId, status: "closed" },
     });
 
     if (!ticket) {
-      return res.status(404).json({ message: "Ticket not found or not closed" });
+      return res
+        .status(404)
+        .json({ message: "Ticket not found or not closed" });
     }
 
     // Update rating & feedback
@@ -806,8 +835,10 @@ const rateTicket = async (req, res) => {
 
     res.json({ message: "Thank you for your feedback!" });
   } catch (error) {
-    console.error(' rateTicket error:', error);
-    res.status(500).json({ message: "Failed to save rating", error: error.message });
+    console.error(" rateTicket error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to save rating", error: error.message });
   }
 };
 
@@ -818,7 +849,13 @@ const deleteTicket = async (req, res) => {
     // Find the ticket
     const ticket = await Ticket.findOne({
       where: { id: ticketId },
-      include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email', 'role_id'] }]
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "name", "email", "role_id"],
+        },
+      ],
     });
 
     if (!ticket) {
@@ -826,7 +863,7 @@ const deleteTicket = async (req, res) => {
     }
 
     // Soft delete
-    ticket.status = 'delete';
+    ticket.status = "delete";
     await ticket.save();
 
     const userEmail = ticket.user.email;
@@ -859,22 +896,29 @@ const deleteTicket = async (req, res) => {
     };
 
     // Send email to user
-    transporter.sendMail({ ...mailOptions, to: userEmail, html: userHtml }, (errU) => {
-      if (errU) console.error(" Failed to email user:", errU.message);
-      else console.log(" Ticket deleted email sent to user");
-    });
+    transporter.sendMail(
+      { ...mailOptions, to: userEmail, html: userHtml },
+      (errU) => {
+        if (errU) console.error(" Failed to email user:", errU.message);
+        else console.log(" Ticket deleted email sent to user");
+      }
+    );
 
     // Send email to admin
-    transporter.sendMail({ ...mailOptions, to: process.env.SMTP_USER, html: adminHtml }, (errA) => {
-      if (errA) console.error(" Failed to email admin:", errA.message);
-      else console.log(" Ticket deleted email sent to admin");
-    });
+    transporter.sendMail(
+      { ...mailOptions, to: process.env.SMTP_USER, html: adminHtml },
+      (errA) => {
+        if (errA) console.error(" Failed to email admin:", errA.message);
+        else console.log(" Ticket deleted email sent to admin");
+      }
+    );
 
     res.json({ message: "Ticket deleted and both notified" });
-
   } catch (error) {
-    console.error(' deleteTicket error:', error);
-    res.status(500).json({ message: "Failed to delete ticket", error: error.message });
+    console.error(" deleteTicket error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete ticket", error: error.message });
   }
 };
 
@@ -889,14 +933,16 @@ const getUnreadCount = async (req, res) => {
     const count = await Notification.count({
       where: {
         email,
-        is_read: 0
-      }
+        is_read: 0,
+      },
     });
 
     res.json({ count });
   } catch (error) {
     console.error(" getUnreadCount error:", error);
-    res.status(500).json({ message: "Error fetching count", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching count", error: error.message });
   }
 };
 
@@ -908,14 +954,25 @@ const getNotificationsByEmail = async (req, res) => {
   try {
     const notifications = await Notification.findAll({
       where: { email },
-      order: [['created_at', 'DESC']],
-      attributes: ['id', 'user_id', 'email', 'ticket_id', 'type', 'message', 'is_read', 'created_at']
+      order: [["created_at", "DESC"]],
+      attributes: [
+        "id",
+        "user_id",
+        "email",
+        "ticket_id",
+        "type",
+        "message",
+        "is_read",
+        "created_at",
+      ],
     });
 
     res.json({ notifications });
   } catch (error) {
     console.error(" getNotificationsByEmail error:", error);
-    res.status(500).json({ message: "Failed to fetch notifications", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch notifications", error: error.message });
   }
 };
 
@@ -927,10 +984,7 @@ const markNotificationsRead = async (req, res) => {
   }
 
   try {
-    await Notification.update(
-      { is_read: 1 },
-      { where: { email } }
-    );
+    await Notification.update({ is_read: 1 }, { where: { email } });
 
     res.json({ message: "Notifications marked as read" });
   } catch (error) {
@@ -942,6 +996,17 @@ const markNotificationsRead = async (req, res) => {
   }
 };
 
-
-
-module.exports = {createTicket, getAllTickets, getTicketDetailById, replyTicket, getReplies, getUserTickets, closeTicket, rateTicket, deleteTicket, getUnreadCount, getNotificationsByEmail, markNotificationsRead }
+module.exports = {
+  createTicket,
+  getAllTickets,
+  getTicketDetailById,
+  replyTicket,
+  getReplies,
+  getUserTickets,
+  closeTicket,
+  rateTicket,
+  deleteTicket,
+  getUnreadCount,
+  getNotificationsByEmail,
+  markNotificationsRead,
+};
