@@ -122,7 +122,7 @@ router.post("/notifications/mark-read/:email", markNotificationsRead);
 router.post("/ticket-notes/:ticketId", addNote);
 router.get("/all-notes/:ticketId",getNotes);
 router.put("/update-notes/:noteId",updateNote);
-router.delete("/delete/:noteId",deleteNote);
+router.delete("/Notedelete/:noteId",deleteNote);
 
 
 

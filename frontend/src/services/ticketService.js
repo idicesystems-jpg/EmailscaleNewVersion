@@ -68,6 +68,14 @@ export const ticketService = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Tickets"],
     }),
+
+    deleteNote: builder.mutation({
+      query: (noteId) => ({
+        url: `Notedelete/${noteId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Tickets"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -80,6 +88,7 @@ export const {
   useGetRepliesQuery,
   useGetUserTicketsQuery,
   useCloseTicketMutation,
-  useGetAllNotesByTicketIdQuery,
-  useAddTicketNoteMutation
+  useLazyGetAllNotesByTicketIdQuery,
+  useAddTicketNoteMutation,
+  useDeleteNoteMutation
 } = ticketService;

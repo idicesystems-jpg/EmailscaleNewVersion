@@ -46,8 +46,9 @@ import {
   useGetRepliesQuery,
   useGetUserTicketsQuery,
   useCloseTicketMutation,
-  useGetAllNotesByTicketIdQuery,
-  useAddTicketNoteMutation
+  useLazyGetAllNotesByTicketIdQuery,
+  useAddTicketNoteMutation,
+  useDeleteNoteMutation,
 } from "@/services/ticketService";
 import { useAllUsersQuery } from "../../services/adminUserService";
 import { useSelector } from "react-redux";
@@ -79,43 +80,6 @@ const AdminSupport = () => {
 
   const { data: users } = useAllUsersQuery();
   //console.log("Users:", users?.users);
-
-  useEffect(() => {
-    //fetchTickets();
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .order("created_at", { ascending: false });
-
-    //setUsers(data || []);
-  };
-
-  const fetchTicketNotes = async (ticketId: string) => {
-    const { data, error } = await supabase
-      .from("ticket_notes")
-      .select(
-        `
-        *,
-        admin:admin_id (
-          id,
-          email,
-          full_name
-        )
-      `
-      )
-      .eq("ticket_id", ticketId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("Error fetching notes:", error);
-    } else {
-      setTicketNotes(data || []);
-    }
-  };
 
   const [createTicket] = useCreateTicketMutation();
 
@@ -157,30 +121,41 @@ const AdminSupport = () => {
     }
   };
 
+  //Import the lazy query
+  const [getNotesByTicketId] = useLazyGetAllNotesByTicketIdQuery();
 
   const [addTicketNote] = useAddTicketNoteMutation();
-  
+
   const handleAddNote = async () => {
     //console.log(selectedTicket.id, newNote);
     if (!newNote.trim() || !selectedTicket) return;
     try {
       const newticketId = selectedTicket.id;
-      await addTicketNote({ticketId:newticketId,note:newNote}).unwrap();
+      await addTicketNote({ ticketId: newticketId, note: newNote }).unwrap();
       toast.success("Note added successfully!");
+      // Refresh the notes list after adding
+      const { data: updatedNotes } = await getNotesByTicketId(newticketId);
+      setTicketNotes(updatedNotes?.notes || []);
     } catch (error) {
       toast.error("Failed to add note");
     }
   };
 
-  
-  const { data:notes} = useGetAllNotesByTicketIdQuery(ticketId);
   const handleViewTicket = async (ticket: any) => {
-    
-    setTicketNotes(notes?.notes || []);
-    console.log("Viewing notes:", notes?.notes);
-    setSelectedTicket(ticket);
-    //await fetchTicketNotes(ticket.id);
-    setDetailsDialogOpen(true);
+    try {
+      // Fetch notes dynamically
+      const { data: notes } = await getNotesByTicketId(ticket.id);
+      ``;
+      // Update local state
+      setTicketNotes(notes?.notes || []);
+      console.log("Viewing notes:", notes?.notes);
+
+      // Set ticket and open modal
+      setSelectedTicket(ticket);
+      setDetailsDialogOpen(true);
+    } catch (error) {
+      console.error("Failed to fetch notes:", error);
+    }
   };
 
   const handleAssignTicket = async (
@@ -202,27 +177,6 @@ const AdminSupport = () => {
       }
     }
   };
-
-  // const fetchTickets = async () => {
-  //   setLoading(true);
-  //   const { data, error } = await supabase
-  //     .from("support_tickets")
-  //     .select(
-  //       `
-  //       *,
-  //       profiles:user_id (full_name, email)
-  //     `
-  //     )
-  //     .order("created_at", { ascending: false });
-
-  //   if (error) {
-  //     toast.error("Error fetching support tickets");
-  //     console.error(error);
-  //   } else {
-  //     setTickets(data || []);
-  //   }
-  //   setLoading(false);
-  // };
 
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
     const updates: any = { status: newStatus };
@@ -259,6 +213,21 @@ const AdminSupport = () => {
     } else {
       toast.success("Ticket deleted successfully");
       //fetchTickets();
+    }
+  };
+
+  const [deleteNote] = useDeleteNoteMutation();
+
+  const handleDeleteNote = async (noteId) => {
+    if (!window.confirm("Are you sure you want to delete this note?")) return;
+    try {
+      await deleteNote(noteId).unwrap();
+      toast.success("Note deleted successfully!");
+       // Refresh the notes list after deleting
+      const { data: updatedNotes } = await getNotesByTicketId(ticketId);
+      setTicketNotes(updatedNotes?.notes || []);
+    } catch (error) {
+      toast.error("Failed to delete note");
     }
   };
 
@@ -415,7 +384,8 @@ const AdminSupport = () => {
                       </TableCell>
                       <TableCell
                         className="max-w-md truncate"
-                        onClick={() => {handleViewTicket(ticket);
+                        onClick={() => {
+                          handleViewTicket(ticket);
                           setTicketId(ticket.id);
                         }}
                       >
@@ -585,25 +555,33 @@ const AdminSupport = () => {
                   </div>
 
                   <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                    {ticketNotes.length === 0 ? (
+                    {ticketNotes?.length === 0 ? (
                       <p className="text-center text-muted-foreground py-4">
                         No notes yet
                       </p>
                     ) : (
-                      ticketNotes.map((note) => (
+                      ticketNotes?.map((note) => (
                         <div
                           key={note.id}
                           className="p-3 bg-muted/20 rounded-lg space-y-2"
                         >
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">
+                            {/* <p className="text-sm font-medium">
                               {note.admin?.full_name ||
                                 note.admin?.email ||
                                 "Admin"}
-                            </p>
+                            </p> */}
                             <p className="text-xs text-muted-foreground">
                               {new Date(note.created_at).toLocaleString()}
                             </p>
+                            <button
+                              onClick={() => handleDeleteNote(note.id)}
+                              className="btn btn-sm btn-danger"
+                              title="Delete Note"
+                              style={{ height: "fit-content" }}
+                            >
+                              🗑️
+                            </button>
                           </div>
                           <p className="text-sm whitespace-pre-wrap">
                             {note.note}
