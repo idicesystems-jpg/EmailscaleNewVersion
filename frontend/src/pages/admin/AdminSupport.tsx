@@ -1,68 +1,87 @@
 import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Trash2, Plus, MessageSquare, User, Clock } from "lucide-react";
+import {
+  useCreateTicketMutation,
+  useGetAllTicketsQuery,
+  useGetTicketDetailByIdQuery,
+  useReplyTicketMutation,
+  useGetRepliesQuery,
+  useGetUserTicketsQuery,
+  useCloseTicketMutation,
+  useLazyGetAllNotesByTicketIdQuery,
+  useAddTicketNoteMutation,
+  useDeleteNoteMutation,
+} from "@/services/ticketService";
+import { useAllUsersQuery } from "../../services/adminUserService";
+import { useSelector } from "react-redux";
 
 const AdminSupport = () => {
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const { user, token, isAuthenticated } = useSelector(
+    (state: any) => state.auth
+  );
+
+  const isAdmin = user?.role_id == 1;
+
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [ticketNotes, setTicketNotes] = useState<any[]>([]);
   const [newNote, setNewNote] = useState("");
+  const [file, setFile] = useState(null);
+  const [ticketId, setTicketId] = useState(null);
   const [newTicket, setNewTicket] = useState({
     user_id: "",
     subject: "",
-    description: "",
-    priority: "medium"
+    message: "",
+    priority: "medium",
   });
 
-  useEffect(() => {
-    fetchTickets();
-    fetchUsers();
-  }, []);
+  const { data, isLoading } = useGetAllTicketsQuery();
+  const tickets = data?.data || [];
 
-  const fetchUsers = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .order('created_at', { ascending: false });
-    
-    setUsers(data || []);
-  };
+  const { data: users } = useAllUsersQuery();
+  //console.log("Users:", users?.users);
 
-  const fetchTicketNotes = async (ticketId: string) => {
-    const { data, error } = await supabase
-      .from('ticket_notes')
-      .select(`
-        *,
-        admin:admin_id (
-          id,
-          email,
-          full_name
-        )
-      `)
-      .eq('ticket_id', ticketId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error("Error fetching notes:", error);
-    } else {
-      setTicketNotes(data || []);
-    }
-  };
+  const [createTicket] = useCreateTicketMutation();
 
   const handleCreateTicket = async () => {
     if (!newTicket.user_id || !newTicket.subject) {
@@ -70,109 +89,111 @@ const AdminSupport = () => {
       return;
     }
 
-    // Generate ticket number
-    const ticketNumber = `TKT-${Date.now().toString().slice(-8)}`;
+    try {
+      const formData = new FormData();
+      formData.append("subject", newTicket.subject);
+      formData.append("message", newTicket.message);
+      formData.append("priority", newTicket.priority);
 
-    const { error } = await supabase
-      .from('support_tickets')
-      .insert([{
-        ...newTicket,
-        ticket_number: ticketNumber
-      }]);
+      // Append user_id if admin creating for someone
+      if (isAdmin && newTicket.user_id) {
+        formData.append("user_id", newTicket.user_id);
+      }
 
-    if (error) {
-      toast.error("Error creating ticket");
-      console.error(error);
-    } else {
+      // Append file if available
+      if (file) formData.append("file", file);
+
+      // all the backend API
+      await createTicket(formData).unwrap();
+
       toast.success("Ticket created successfully");
       setCreateDialogOpen(false);
-      setNewTicket({ user_id: "", subject: "", description: "", priority: "medium" });
-      fetchTickets();
+      setNewTicket({
+        user_id: "",
+        subject: "",
+        message: "",
+        priority: "medium",
+      });
+      setFile(null);
+    } catch (error) {
+      console.error("Error creating ticket:", error);
+      toast.error(error?.data?.message || "Error creating ticket");
     }
   };
 
+  //Import the lazy query
+  const [getNotesByTicketId] = useLazyGetAllNotesByTicketIdQuery();
+
+  const [addTicketNote] = useAddTicketNoteMutation();
+
   const handleAddNote = async () => {
+    //console.log(selectedTicket.id, newNote);
     if (!newNote.trim() || !selectedTicket) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('ticket_notes')
-      .insert([{
-        ticket_id: selectedTicket.id,
-        admin_id: user.id,
-        note: newNote
-      }]);
-
-    if (error) {
-      toast.error("Error adding note");
-      console.error(error);
-    } else {
-      toast.success("Note added");
-      setNewNote("");
-      fetchTicketNotes(selectedTicket.id);
+    try {
+      const newticketId = selectedTicket.id;
+      await addTicketNote({ ticketId: newticketId, note: newNote }).unwrap();
+      toast.success("Note added successfully!");
+      // Refresh the notes list after adding
+      const { data: updatedNotes } = await getNotesByTicketId(newticketId);
+      setTicketNotes(updatedNotes?.notes || []);
+    } catch (error) {
+      toast.error("Failed to add note");
     }
   };
 
   const handleViewTicket = async (ticket: any) => {
-    setSelectedTicket(ticket);
-    await fetchTicketNotes(ticket.id);
-    setDetailsDialogOpen(true);
+    try {
+      // Fetch notes dynamically
+      const { data: notes } = await getNotesByTicketId(ticket.id);
+      ``;
+      // Update local state
+      setTicketNotes(notes?.notes || []);
+      console.log("Viewing notes:", notes?.notes);
+
+      // Set ticket and open modal
+      setSelectedTicket(ticket);
+      setDetailsDialogOpen(true);
+    } catch (error) {
+      console.error("Failed to fetch notes:", error);
+    }
   };
 
-  const handleAssignTicket = async (ticketId: string, adminId: string | null) => {
+  const handleAssignTicket = async (
+    ticketId: string,
+    adminId: string | null
+  ) => {
     const { error } = await supabase
-      .from('support_tickets')
+      .from("support_tickets")
       .update({ assigned_to: adminId })
-      .eq('id', ticketId);
+      .eq("id", ticketId);
 
     if (error) {
       toast.error("Error assigning ticket");
     } else {
       toast.success("Ticket assigned");
-      fetchTickets();
+      //fetchTickets();
       if (selectedTicket?.id === ticketId) {
         setSelectedTicket({ ...selectedTicket, assigned_to: adminId });
       }
     }
   };
 
-  const fetchTickets = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('support_tickets')
-      .select(`
-        *,
-        profiles:user_id (full_name, email)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error("Error fetching support tickets");
-      console.error(error);
-    } else {
-      setTickets(data || []);
-    }
-    setLoading(false);
-  };
-
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
     const updates: any = { status: newStatus };
-    if (newStatus === 'resolved' || newStatus === 'closed') {
+    if (newStatus === "resolved" || newStatus === "closed") {
       updates.resolved_at = new Date().toISOString();
     }
 
     const { error } = await supabase
-      .from('support_tickets')
+      .from("support_tickets")
       .update(updates)
-      .eq('id', ticketId);
+      .eq("id", ticketId);
 
     if (error) {
       toast.error("Error updating ticket status");
     } else {
       toast.success("Ticket status updated");
-      fetchTickets();
+      //fetchTickets();
       if (selectedTicket?.id === ticketId) {
         setSelectedTicket({ ...selectedTicket, ...updates });
       }
@@ -183,15 +204,30 @@ const AdminSupport = () => {
     if (!confirm("Are you sure you want to delete this ticket?")) return;
 
     const { error } = await supabase
-      .from('support_tickets')
+      .from("support_tickets")
       .delete()
-      .eq('id', ticketId);
+      .eq("id", ticketId);
 
     if (error) {
       toast.error("Error deleting ticket");
     } else {
       toast.success("Ticket deleted successfully");
-      fetchTickets();
+      //fetchTickets();
+    }
+  };
+
+  const [deleteNote] = useDeleteNoteMutation();
+
+  const handleDeleteNote = async (noteId) => {
+    if (!window.confirm("Are you sure you want to delete this note?")) return;
+    try {
+      await deleteNote(noteId).unwrap();
+      toast.success("Note deleted successfully!");
+       // Refresh the notes list after deleting
+      const { data: updatedNotes } = await getNotesByTicketId(ticketId);
+      setTicketNotes(updatedNotes?.notes || []);
+    } catch (error) {
+      toast.error("Failed to delete note");
     }
   };
 
@@ -199,7 +235,9 @@ const AdminSupport = () => {
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Support Tickets</h1>
+          <h1 className="text-3xl font-bold text-foreground">
+            Support Tickets
+          </h1>
           <p className="text-muted-foreground">Manage all support requests</p>
         </div>
 
@@ -208,9 +246,14 @@ const AdminSupport = () => {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>All Support Tickets</CardTitle>
-                <CardDescription>View and respond to user support requests</CardDescription>
+                <CardDescription>
+                  View and respond to user support requests
+                </CardDescription>
               </div>
-              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <Dialog
+                open={createDialogOpen}
+                onOpenChange={setCreateDialogOpen}
+              >
                 <DialogTrigger asChild>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />
@@ -220,19 +263,26 @@ const AdminSupport = () => {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Create Support Ticket</DialogTitle>
-                    <DialogDescription>Create a ticket on behalf of a user</DialogDescription>
+                    <DialogDescription>
+                      Create a ticket on behalf of a user
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
                       <Label>User</Label>
-                      <Select value={newTicket.user_id} onValueChange={(v) => setNewTicket({...newTicket, user_id: v})}>
+                      <Select
+                        value={newTicket.user_id}
+                        onValueChange={(v) =>
+                          setNewTicket({ ...newTicket, user_id: v })
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select user..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {users.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.full_name || user.email}
+                          {users?.users?.map((user) => (
+                            <SelectItem key={user?.id} value={user?.id}>
+                              {user.fname + "  " + user.lname || user.email}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -242,22 +292,37 @@ const AdminSupport = () => {
                       <Label>Subject</Label>
                       <Input
                         value={newTicket.subject}
-                        onChange={(e) => setNewTicket({...newTicket, subject: e.target.value})}
+                        onChange={(e) =>
+                          setNewTicket({
+                            ...newTicket,
+                            subject: e.target.value,
+                          })
+                        }
                         placeholder="Brief description of the issue"
                       />
                     </div>
                     <div>
                       <Label>Description</Label>
                       <Textarea
-                        value={newTicket.description}
-                        onChange={(e) => setNewTicket({...newTicket, description: e.target.value})}
+                        value={newTicket.message}
+                        onChange={(e) =>
+                          setNewTicket({
+                            ...newTicket,
+                            message: e.target.value,
+                          })
+                        }
                         placeholder="Detailed description..."
                         rows={4}
                       />
                     </div>
                     <div>
                       <Label>Priority</Label>
-                      <Select value={newTicket.priority} onValueChange={(v) => setNewTicket({...newTicket, priority: v})}>
+                      <Select
+                        value={newTicket.priority}
+                        onValueChange={(v) =>
+                          setNewTicket({ ...newTicket, priority: v })
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -268,6 +333,13 @@ const AdminSupport = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <input
+                        type="file"
+                        className="form-control mb-2"
+                        onChange={(e) => setFile(e.target.files[0])}
+                      />
+                    </div>
                     <Button onClick={handleCreateTicket} className="w-full">
                       Create Ticket
                     </Button>
@@ -277,12 +349,15 @@ const AdminSupport = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {/* {loading ? (
               <div className="flex justify-center p-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : tickets.length === 0 ? (
-              <p className="text-center text-muted-foreground p-8">No support tickets found</p>
+            ) :  */}
+            {tickets?.length === 0 ? (
+              <p className="text-center text-muted-foreground p-8">
+                No support tickets found
+              </p>
             ) : (
               <Table>
                 <TableHeader>
@@ -298,38 +373,52 @@ const AdminSupport = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tickets.map((ticket) => (
-                    <TableRow key={ticket.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell className="font-medium">{ticket.ticket_number}</TableCell>
+                  {tickets?.map((ticket) => (
+                    <TableRow
+                      key={ticket.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                    >
+                      <TableCell className="font-medium">{ticket.id}</TableCell>
                       <TableCell>
-                        {ticket.profiles?.full_name || ticket.profiles?.email || "—"}
+                        {ticket.user.name || ticket.profiles?.email || "—"}
                       </TableCell>
-                      <TableCell 
+                      <TableCell
                         className="max-w-md truncate"
-                        onClick={() => handleViewTicket(ticket)}
+                        onClick={() => {
+                          handleViewTicket(ticket);
+                          setTicketId(ticket.id);
+                        }}
                       >
                         {ticket.subject}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={
-                          ticket.priority === 'high' ? 'destructive' :
-                          ticket.priority === 'medium' ? 'secondary' :
-                          'default'
-                        }>
+                        <Badge
+                          variant={
+                            ticket.priority === "high"
+                              ? "destructive"
+                              : ticket.priority === "medium"
+                              ? "secondary"
+                              : "default"
+                          }
+                        >
                           {ticket.priority}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <Select
                           value={ticket.status}
-                          onValueChange={(value) => handleStatusChange(ticket.id, value)}
+                          onValueChange={(value) =>
+                            handleStatusChange(ticket.id, value)
+                          }
                         >
                           <SelectTrigger className="w-32">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="open">Open</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
+                            <SelectItem value="in_progress">
+                              In Progress
+                            </SelectItem>
                             <SelectItem value="resolved">Resolved</SelectItem>
                             <SelectItem value="closed">Closed</SelectItem>
                           </SelectContent>
@@ -338,22 +427,33 @@ const AdminSupport = () => {
                       <TableCell>
                         <Select
                           value={ticket.assigned_to || "unassigned"}
-                          onValueChange={(value) => handleAssignTicket(ticket.id, value === "unassigned" ? null : value)}
+                          onValueChange={(value) =>
+                            handleAssignTicket(
+                              ticket.id,
+                              value === "unassigned" ? null : value
+                            )
+                          }
                         >
                           <SelectTrigger className="w-40">
                             <SelectValue placeholder="Unassigned" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
-                            {users.filter(u => u.id).map((user) => (
-                              <SelectItem key={user.id} value={user.id}>
-                                {user.full_name || user.email}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="unassigned">
+                              Unassigned
+                            </SelectItem>
+                            {users?.users
+                              .filter((u) => u.id)
+                              .map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.full_name || user.email}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell>{new Date(ticket.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {new Date(ticket.created_at).toLocaleDateString()}
+                      </TableCell>
                       <TableCell className="flex gap-2">
                         <Button
                           variant="ghost"
@@ -384,7 +484,7 @@ const AdminSupport = () => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-primary" />
-                Ticket Details - {selectedTicket?.ticket_number}
+                Ticket Details - {selectedTicket?.id}
               </DialogTitle>
             </DialogHeader>
             {selectedTicket && (
@@ -395,7 +495,7 @@ const AdminSupport = () => {
                     <p className="text-sm text-muted-foreground">User</p>
                     <p className="font-medium flex items-center gap-2">
                       <User className="h-4 w-4" />
-                      {selectedTicket.profiles?.full_name || selectedTicket.profiles?.email}
+                      {selectedTicket.user?.name || "-"}
                     </p>
                   </div>
                   <div>
@@ -407,11 +507,15 @@ const AdminSupport = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Priority</p>
-                    <Badge variant={
-                      selectedTicket.priority === 'high' ? 'destructive' :
-                      selectedTicket.priority === 'medium' ? 'secondary' :
-                      'default'
-                    }>
+                    <Badge
+                      variant={
+                        selectedTicket.priority === "high"
+                          ? "destructive"
+                          : selectedTicket.priority === "medium"
+                          ? "secondary"
+                          : "default"
+                      }
+                    >
                       {selectedTicket.priority}
                     </Badge>
                   </div>
@@ -424,13 +528,17 @@ const AdminSupport = () => {
                 {/* Subject & Description */}
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-sm text-muted-foreground">Subject</Label>
+                    <Label className="text-sm text-muted-foreground">
+                      Subject
+                    </Label>
                     <p className="font-medium">{selectedTicket.subject}</p>
                   </div>
                   <div>
-                    <Label className="text-sm text-muted-foreground">Description</Label>
+                    <Label className="text-sm text-muted-foreground">
+                      Description
+                    </Label>
                     <p className="text-sm whitespace-pre-wrap p-3 bg-muted/20 rounded-lg">
-                      {selectedTicket.description || "No description provided"}
+                      {selectedTicket.message || "No description provided"}
                     </p>
                   </div>
                 </div>
@@ -438,25 +546,46 @@ const AdminSupport = () => {
                 {/* Notes Section */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-lg font-semibold">Internal Notes</Label>
-                    <Badge variant="secondary">{ticketNotes.length} notes</Badge>
+                    <Label className="text-lg font-semibold">
+                      Internal Notes
+                    </Label>
+                    <Badge variant="secondary">
+                      {ticketNotes.length} notes
+                    </Badge>
                   </div>
-                  
+
                   <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                    {ticketNotes.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-4">No notes yet</p>
+                    {ticketNotes?.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">
+                        No notes yet
+                      </p>
                     ) : (
-                      ticketNotes.map((note) => (
-                        <div key={note.id} className="p-3 bg-muted/20 rounded-lg space-y-2">
+                      ticketNotes?.map((note) => (
+                        <div
+                          key={note.id}
+                          className="p-3 bg-muted/20 rounded-lg space-y-2"
+                        >
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium">
-                              {note.admin?.full_name || note.admin?.email || "Admin"}
-                            </p>
+                            {/* <p className="text-sm font-medium">
+                              {note.admin?.full_name ||
+                                note.admin?.email ||
+                                "Admin"}
+                            </p> */}
                             <p className="text-xs text-muted-foreground">
                               {new Date(note.created_at).toLocaleString()}
                             </p>
+                            <button
+                              onClick={() => handleDeleteNote(note.id)}
+                              className="btn btn-sm btn-danger"
+                              title="Delete Note"
+                              style={{ height: "fit-content" }}
+                            >
+                              🗑️
+                            </button>
                           </div>
-                          <p className="text-sm whitespace-pre-wrap">{note.note}</p>
+                          <p className="text-sm whitespace-pre-wrap">
+                            {note.note}
+                          </p>
                         </div>
                       ))
                     )}
@@ -471,7 +600,7 @@ const AdminSupport = () => {
                       placeholder="Add an internal note..."
                       rows={3}
                     />
-                    <Button 
+                    <Button
                       onClick={handleAddNote}
                       disabled={!newNote.trim()}
                       className="w-full"
