@@ -30,6 +30,8 @@ const {
   updateDomainStatus,
   destroyDomain,
   exportDomainsCsv,
+  checkAlternateDomainAvailability,
+  checkDomainAvailability
 } = require("../controllers/domainController");
 
 const {
@@ -62,6 +64,8 @@ const {
 
 const { addNote, getNotes, updateNote, deleteNote} = require("../controllers/notesController");
 
+const { getAllEmailCampaigns } = require("../controllers/emailCampaignController");
+
 // Routes
 router.post("/login", login);
 
@@ -90,6 +94,9 @@ router.post("/import-domains", upload.single("import_file"), importDomainsCsv);
 router.put("/domains/:id/status", updateDomainStatus);
 router.delete("/domains/:id", destroyDomain);
 router.get("/export-domains", exportDomainsCsv);
+
+router.post('/checkAlternateDomainAvailability', checkAlternateDomainAvailability);
+router.post('/check-domain-availability', checkDomainAvailability);
 
 //emailWarmup Routes.
 router.get("/email-provider-counts", getEmailProviderCounts);
@@ -125,6 +132,6 @@ router.put("/update-notes/:noteId",updateNote);
 router.delete("/Notedelete/:noteId",deleteNote);
 
 
-
+router.post("/get-all-email-campaigns", getAllEmailCampaigns);
 
 module.exports = router;
