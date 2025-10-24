@@ -54,6 +54,9 @@ import {
 } from "@/services/ticketService";
 import { useAllUsersQuery } from "../../services/adminUserService";
 import { useSelector } from "react-redux";
+import Pagination from "../../components/Pagination";
+import SearchableSelect from "./SearchableSelect";
+const API_URL = import.meta.env.VITE_API_URL;
 
 const AdminSupport = () => {
   const navigate = useNavigate();
@@ -89,7 +92,19 @@ const AdminSupport = () => {
     priority: "medium",
   });
 
-  const { data, isLoading } = useGetAllTicketsQuery();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [filter, setFilter] = useState({ status: "open", priority: "" });
+
+  const { data } = useGetAllTicketsQuery({
+    page,
+    limit,
+    status: filter.status,
+    priority: filter.priority,
+  });
+
+  console.log("data", data);
+
   const tickets = data?.data || [];
 
   const { data: users } = useAllUsersQuery();
@@ -273,6 +288,7 @@ const AdminSupport = () => {
   const [replyTicket] = useReplyTicketMutation();
 
   const handleReply = async (e) => {
+    error;
     e.preventDefault();
     const formData = new FormData();
     formData.append("ticket_id", ticket?.id);
@@ -346,6 +362,68 @@ const AdminSupport = () => {
                     Create Ticket
                   </Button>
                 </DialogTrigger>
+                <div>
+                  {/* <select
+                    className="form-control"
+                    value={filter.status}
+                    onChange={(e) => {
+                      setPage(1); // reset page when filter changes
+                      setFilter({ ...filter, status: e.target.value });
+                    }}
+                  >
+                    <option value="">All Status</option>
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                  </select> */}
+                  <Select
+                    value={filter.status}
+                    onValueChange={(v) => {
+                      setPage(1); // reset page when filter changes
+                      setFilter({ ...filter, status: v });
+                    }}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      <SelectItem value="open">🟢 Open</SelectItem>
+                      <SelectItem value="closed">🔴 Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  {/* <select
+                    className="form-control"
+                    value={filter.priority}
+                    onChange={(e) => {
+                      setPage(1); // reset page when filter changes
+                      setFilter({ ...filter, priority: e.target.value });
+                    }}
+                  >
+                    <option value="">All Priorities</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select> */}
+                  <Select
+                    value={filter.priority}
+                    onValueChange={(v) => {
+                      setPage(1); // reset page when filter changes
+                      setFilter({ ...filter, priority: v });
+                    }}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="All Priorities" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Create Support Ticket</DialogTitle>
@@ -356,7 +434,15 @@ const AdminSupport = () => {
                   <div className="space-y-4">
                     <div>
                       <Label>User</Label>
-                      <Select
+                      <SearchableSelect
+                        users={users}
+                        value={newTicket.user_id}
+                        onChange={(v) =>
+                          setNewTicket({ ...newTicket, user_id: v })
+                        }
+                      />
+
+                      {/* <Select
                         value={newTicket.user_id}
                         onValueChange={(v) =>
                           setNewTicket({ ...newTicket, user_id: v })
@@ -372,7 +458,7 @@ const AdminSupport = () => {
                             </SelectItem>
                           ))}
                         </SelectContent>
-                      </Select>
+                      </Select> */}
                     </div>
                     <div>
                       <Label>Subject</Label>
@@ -434,6 +520,7 @@ const AdminSupport = () => {
               </Dialog>
             </div>
           </CardHeader>
+
           <CardContent>
             {/* {loading ? (
               <div className="flex justify-center p-8">
@@ -445,121 +532,131 @@ const AdminSupport = () => {
                 No support tickets found
               </p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ticket #</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tickets?.map((ticket) => (
-                    <TableRow
-                      key={ticket.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                    >
-                      <TableCell className="font-medium">{ticket.id}</TableCell>
-                      <TableCell>
-                        {ticket.user.name || ticket.profiles?.email || "—"}
-                      </TableCell>
-                      <TableCell
-                        className="max-w-md truncate"
-                        onClick={() => {
-                          handleViewTicket(ticket);
-                          setTicketId(ticket.id);
-                        }}
-                      >
-                        {ticket.subject}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            ticket.priority === "high"
-                              ? "destructive"
-                              : ticket.priority === "medium"
-                              ? "secondary"
-                              : "default"
-                          }
-                        >
-                          {ticket.priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={ticket.status}
-                          onValueChange={(value) =>
-                            handleStatusChange(ticket.id, value)
-                          }
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="open">Open</SelectItem>
-                            <SelectItem value="in_progress">
-                              In Progress
-                            </SelectItem>
-                            <SelectItem value="resolved">Resolved</SelectItem>
-                            <SelectItem value="closed">Closed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={ticket.assigned_to || "unassigned"}
-                          onValueChange={(value) =>
-                            handleAssignTicket(
-                              ticket.id,
-                              value === "unassigned" ? null : value
-                            )
-                          }
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Unassigned" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">
-                              Unassigned
-                            </SelectItem>
-                            {users?.users
-                              .filter((u) => u.id)
-                              .map((user) => (
-                                <SelectItem key={user.id} value={user.id}>
-                                  {user.full_name || user.email}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(ticket.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewTicket(ticket)}
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteTicket(ticket.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ticket #</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Assigned To</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {tickets?.map((ticket) => (
+                      <TableRow
+                        key={ticket.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                      >
+                        <TableCell className="font-medium">
+                          {ticket.id}
+                        </TableCell>
+                        <TableCell>
+                          {ticket.user.name || ticket.profiles?.email || "—"}
+                        </TableCell>
+                        <TableCell
+                          className="max-w-md truncate"
+                          onClick={() => {
+                            handleViewTicket(ticket);
+                            setTicketId(ticket.id);
+                          }}
+                        >
+                          {ticket.subject}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              ticket.priority === "high"
+                                ? "destructive"
+                                : ticket.priority === "medium"
+                                ? "secondary"
+                                : "default"
+                            }
+                          >
+                            {ticket.priority}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={ticket.status}
+                            onValueChange={(value) =>
+                              handleStatusChange(ticket.id, value)
+                            }
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="open">Open</SelectItem>
+                              <SelectItem value="in_progress">
+                                In Progress
+                              </SelectItem>
+                              <SelectItem value="resolved">Resolved</SelectItem>
+                              <SelectItem value="closed">Closed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={ticket.assigned_to || "unassigned"}
+                            onValueChange={(value) =>
+                              handleAssignTicket(
+                                ticket.id,
+                                value === "unassigned" ? null : value
+                              )
+                            }
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Unassigned" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">
+                                Unassigned
+                              </SelectItem>
+                              {users?.users
+                                .filter((u) => u.id)
+                                .map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.full_name || user.email}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(ticket.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewTicket(ticket)}
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTicket(ticket.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <Pagination
+                  page={page}
+                  setPage={setPage}
+                  limit={limit}
+                  total={data?.pagination?.total}
+                />
+              </>
             )}
           </CardContent>
         </Card>
@@ -647,19 +744,22 @@ const AdminSupport = () => {
                           backgroundColor: "#fafafa",
                           borderRadius: "8px",
                           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
                         }}
                       >
                         <h3 className="text-center mb-0">
                           Ticket Conversation
                         </h3>
                         {status == "open" && (
-                          <button
+                          <Button
                             onClick={handleCloseTicket}
                             className="btn btn-sm btn-danger"
                             style={{ height: "fit-content" }}
                           >
                             ✕
-                          </button>
+                          </Button>
                         )}
                       </div>
 
@@ -676,13 +776,17 @@ const AdminSupport = () => {
                               <div
                                 className="rounded-circle text-white d-flex justify-content-center align-items-center"
                                 style={{
-                                  width: 100,
+                                  width: 40,
                                   height: 40,
                                   fontWeight: "bold",
                                   backgroundColor: "#d946ef",
+                                  borderRadius: "50%",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  display: "flex",
                                 }}
                               >
-                                {reply.user.name}
+                                {getInitials(reply.user.name)}
                               </div>
                               <div
                                 className={`ms-2 me-2 p-3 rounded shadow-sm ${
@@ -707,7 +811,7 @@ const AdminSupport = () => {
 
                                 {reply.file && (
                                   <a
-                                    href={`http://localhost:5173/api/files/${reply.file}`}
+                                    href={`${API_URL}files/${reply.file}`}
                                     target="_blank"
                                     rel="noreferrer"
                                   >
@@ -726,20 +830,19 @@ const AdminSupport = () => {
                             encType="multipart/form-data"
                             className="d-flex flex-column"
                           >
-                            <textarea
-                              rows="4"
+                            <Textarea
                               placeholder="Type your reply..."
                               className="form-control mb-3"
                               value={message}
                               onChange={(e) => setMessage(e.target.value)}
                               required
                             />
-                            <input
+                            <Input
                               type="file"
                               className="form-control mb-2"
                               onChange={(e) => setFile(e.target.files[0])}
                             />
-                            <button
+                            <Button
                               className="btn text-white border-0 mt-4 mx-auto"
                               style={{
                                 backgroundColor: "#d946ef",
@@ -755,7 +858,7 @@ const AdminSupport = () => {
                               ) : (
                                 "Send Reply"
                               )}
-                            </button>
+                            </Button>
                           </form>
                         ) : (
                           <div className="alert alert-secondary">
@@ -767,7 +870,26 @@ const AdminSupport = () => {
                           <div className="mt-4">
                             <h5>Rate your experience</h5>
                             <form onSubmit={handleRatingSubmit}>
-                              <select
+                              <Select
+                                value={rating}
+                                onValueChange={(v) => setRating(v)}
+                              >
+                                <SelectTrigger className="w-40">
+                                  <SelectValue placeholder="Select rating" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="5">
+                                    ⭐⭐⭐⭐⭐ Excellent
+                                  </SelectItem>
+                                  <SelectItem value="4">
+                                    ⭐⭐⭐⭐ Good
+                                  </SelectItem>
+                                  <SelectItem value="3">⭐⭐⭐ Okay</SelectItem>
+                                  <SelectItem value="2">⭐⭐ Poor</SelectItem>
+                                  <SelectItem value="1">⭐ Terrible</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {/* <select
                                 className="form-select mb-2"
                                 value={rating}
                                 onChange={(e) => setRating(e.target.value)}
@@ -779,16 +901,16 @@ const AdminSupport = () => {
                                 <option value="3">⭐⭐⭐ Okay</option>
                                 <option value="2">⭐⭐ Poor</option>
                                 <option value="1">⭐ Terrible</option>
-                              </select>
-                              <textarea
+                              </select> */}
+                              <Textarea
                                 className="form-control mb-2"
                                 placeholder="Additional feedback (optional)"
                                 value={feedback}
                                 onChange={(e) => setFeedback(e.target.value)}
                               />
-                              <button className="btn btn-success">
+                              <Button className="btn btn-success">
                                 Submit Rating
-                              </button>
+                              </Button>
                             </form>
                           </div>
                         )}

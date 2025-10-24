@@ -1,6 +1,7 @@
 const express = require("express");
 const multer = require("multer");
-const upload = multer({ dest: "uploads/" });
+const  path  = require("path");
+//const upload = multer({ dest: "uploads/" });
 const router = express.Router();
 const authenticateToken = require("../middlewares/authMiddleware");
 const {
@@ -65,6 +66,20 @@ const {
 const { addNote, getNotes, updateNote, deleteNote} = require("../controllers/notesController");
 
 const { getAllEmailCampaigns } = require("../controllers/emailCampaignController");
+
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname); // get original extension (.jpg, .png, etc.)
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${ext}`;
+    cb(null, uniqueName);
+  },
+});
+
+const upload = multer({ storage });
 
 // Routes
 router.post("/login", login);
