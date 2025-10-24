@@ -1,14 +1,62 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { HelpCircle, MessageCircle, Ticket, Video, Send } from "lucide-react";
 import { useState } from "react";
+import {
+  useCreateTicketMutation,
+  useGetAllTicketsQuery,
+  useLazyGetTicketDetailByIdQuery,
+  useReplyTicketMutation,
+  useLazyGetRepliesQuery,
+  useGetUserTicketsQuery,
+  useCloseTicketMutation,
+  useLazyGetAllNotesByTicketIdQuery,
+  useAddTicketNoteMutation,
+  useDeleteNoteMutation,
+  useRateTicketMutation,
+} from "@/services/ticketService";
+import { useSelector } from "react-redux";
+import { toast } from "sonner";
 
 const Support = () => {
   const [showTicketPrompt, setShowTicketPrompt] = useState(false);
@@ -16,11 +64,28 @@ const Support = () => {
   const [showChatDialog, setShowChatDialog] = useState(false);
   const [showFaqDialog, setShowFaqDialog] = useState(false);
   const [showVideosDialog, setShowVideosDialog] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketMessage, setTicketMessage] = useState("");
+  const [chatMessage, setChatMessage] = useState("");
+  const [file, setFile] = useState(null);
+  const [chatMessages, setChatMessages] = useState<
+    Array<{ role: "user" | "assistant"; content: string }>
+  >([]);
+
+
+    const { user, token, isAuthenticated } = useSelector(
+      (state: any) => state.auth
+    );
   
-  const [ticketSubject, setTicketSubject] = useState('');
-  const [ticketMessage, setTicketMessage] = useState('');
-  const [chatMessage, setChatMessage] = useState('');
-  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const isAdmin = user?.role_id == 1;
+  const [newTicket, setNewTicket] = useState({
+    user_id: "",
+    subject: "",
+    message: "",
+    priority: "medium",
+  });
 
   const handleTicketClick = () => {
     setShowTicketPrompt(true);
@@ -32,39 +97,47 @@ const Support = () => {
   };
 
   const handleSubmitTicket = () => {
-    console.log('Ticket submitted:', { subject: ticketSubject, message: ticketMessage });
-    setTicketSubject('');
-    setTicketMessage('');
+    console.log("Ticket submitted:", {
+      subject: ticketSubject,
+      message: ticketMessage,
+    });
+    setTicketSubject("");
+    setTicketMessage("");
     setShowTicketForm(false);
   };
 
   const handleSendMessage = () => {
     if (!chatMessage.trim()) return;
-    setChatMessages([...chatMessages, { role: 'user', content: chatMessage }]);
-    setChatMessage('');
+    setChatMessages([...chatMessages, { role: "user", content: chatMessage }]);
+    setChatMessage("");
   };
 
   const faqs = [
     {
       question: "How do I set up email warmup?",
-      answer: "Navigate to the Email Warmup section and follow the step-by-step guide to configure your warmup settings."
+      answer:
+        "Navigate to the Email Warmup section and follow the step-by-step guide to configure your warmup settings.",
     },
     {
       question: "What is domain forwarding?",
-      answer: "Domain forwarding redirects your domain to another website. Note: This can negatively impact email deliverability."
+      answer:
+        "Domain forwarding redirects your domain to another website. Note: This can negatively impact email deliverability.",
     },
     {
       question: "How many emails should I have per domain?",
-      answer: "We recommend 3 emails per domain for optimal deliverability and warmup performance."
+      answer:
+        "We recommend 3 emails per domain for optimal deliverability and warmup performance.",
     },
     {
       question: "How do I connect my integrations?",
-      answer: "Go to the Integrations page and select the platform you want to connect (Highlevel, Instantly, or Smartlead)."
+      answer:
+        "Go to the Integrations page and select the platform you want to connect (Highlevel, Instantly, or Smartlead).",
     },
     {
       question: "What payment methods do you accept?",
-      answer: "We accept all major credit cards and offer various subscription plans to fit your needs."
-    }
+      answer:
+        "We accept all major credit cards and offer various subscription plans to fit your needs.",
+    },
   ];
 
   const videos = [
@@ -72,20 +145,62 @@ const Support = () => {
     { title: "Setting Up Your First Campaign", url: "#", duration: "8:15" },
     { title: "Email Warmup Best Practices", url: "#", duration: "6:45" },
     { title: "Understanding Deliverability", url: "#", duration: "10:30" },
-    { title: "Integration Setup Guide", url: "#", duration: "7:12" }
+    { title: "Integration Setup Guide", url: "#", duration: "7:12" },
   ];
+
+  const [createTicket] = useCreateTicketMutation();
+  
+    const handleCreateTicket = async () => {
+      if (!newTicket.subject) {
+        toast.error("Please fill in all required fields");
+        return;
+      }
+  
+      try {
+        const formData = new FormData();
+        formData.append("subject", newTicket.subject);
+        formData.append("message", newTicket.message);
+        formData.append("priority", newTicket.priority);
+  
+        // Append user_id if admin creating for someone
+        if (isAdmin && newTicket.user_id) {
+          formData.append("user_id", newTicket.user_id);
+        }
+  
+        // Append file if available
+        if (file) formData.append("file", file);
+  
+        // all the backend API
+        await createTicket(formData).unwrap();
+  
+        toast.success("Ticket created successfully");
+        setCreateDialogOpen(false);
+        setNewTicket({
+          user_id: "",
+          subject: "",
+          message: "",
+          priority: "medium",
+        });
+        setFile(null);
+      } catch (error) {
+        console.error("Error creating ticket:", error);
+        toast.error(error?.data?.message || "Error creating ticket");
+      }
+    };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Support</h1>
-          <p className="text-muted-foreground">Get help and support for EmailScale</p>
+          <p className="text-muted-foreground">
+            Get help and support for EmailScale
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Support Ticket */}
-          <Card 
+          <Card
             className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-colors cursor-pointer"
             onClick={handleTicketClick}
           >
@@ -94,7 +209,9 @@ const Support = () => {
                 <Ticket className="h-5 w-5 mr-2 text-primary" />
                 Support Ticket
               </CardTitle>
-              <CardDescription>Submit a support ticket to our team</CardDescription>
+              <CardDescription>
+                Submit a support ticket to our team
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Button className="w-full bg-gradient-to-r from-primary to-primary-glow">
@@ -104,7 +221,7 @@ const Support = () => {
           </Card>
 
           {/* Live AI Chat */}
-          <Card 
+          <Card
             className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-colors cursor-pointer"
             onClick={() => setShowChatDialog(true)}
           >
@@ -113,7 +230,9 @@ const Support = () => {
                 <MessageCircle className="h-5 w-5 mr-2 text-primary" />
                 Live AI Chat
               </CardTitle>
-              <CardDescription>Get instant answers from our AI assistant</CardDescription>
+              <CardDescription>
+                Get instant answers from our AI assistant
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Button className="w-full" variant="outline">
@@ -123,7 +242,7 @@ const Support = () => {
           </Card>
 
           {/* FAQs */}
-          <Card 
+          <Card
             className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-colors cursor-pointer"
             onClick={() => setShowFaqDialog(true)}
           >
@@ -142,7 +261,7 @@ const Support = () => {
           </Card>
 
           {/* Helpful Videos */}
-          <Card 
+          <Card
             className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-colors cursor-pointer"
             onClick={() => setShowVideosDialog(true)}
           >
@@ -165,14 +284,20 @@ const Support = () => {
         <AlertDialog open={showTicketPrompt} onOpenChange={setShowTicketPrompt}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Have you checked our resources?</AlertDialogTitle>
+              <AlertDialogTitle>
+                Have you checked our resources?
+              </AlertDialogTitle>
               <AlertDialogDescription className="space-y-2">
-                <p>Before creating a support ticket, we recommend checking our:</p>
+                <p>
+                  Before creating a support ticket, we recommend checking our:
+                </p>
                 <ul className="list-disc list-inside space-y-1 ml-2">
                   <li>Video Library - Step-by-step tutorials</li>
                   <li>FAQ Section - Common questions and answers</li>
                 </ul>
-                <p className="mt-4">You might find a quick answer to your question there!</p>
+                <p className="mt-4">
+                  You might find a quick answer to your question there!
+                </p>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -196,7 +321,7 @@ const Support = () => {
                 Our team will respond to your ticket within 24 hours
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            {/* <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="ticket-subject">Subject</Label>
                 <Input
@@ -224,6 +349,63 @@ const Support = () => {
                 <Send className="h-4 w-4 mr-2" />
                 Submit Ticket
               </Button>
+            </div> */}
+            <div className="space-y-4">
+              <div>
+                <Label>Subject</Label>
+                <Input
+                  value={newTicket.subject}
+                  onChange={(e) =>
+                    setNewTicket({
+                      ...newTicket,
+                      subject: e.target.value,
+                    })
+                  }
+                  placeholder="Brief description of the issue"
+                />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Textarea
+                  value={newTicket.message}
+                  onChange={(e) =>
+                    setNewTicket({
+                      ...newTicket,
+                      message: e.target.value,
+                    })
+                  }
+                  placeholder="Detailed description..."
+                  rows={4}
+                />
+              </div>
+              <div>
+                <Label>Priority</Label>
+                <Select
+                  value={newTicket.priority}
+                  onValueChange={(v) =>
+                    setNewTicket({ ...newTicket, priority: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <input
+                  type="file"
+                  className="form-control mb-2"
+                  onChange={(e) => setFile(e.target.files[0])}
+                />
+              </div>
+              <Button onClick={handleCreateTicket} className="w-full">
+                Create Ticket
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -250,13 +432,15 @@ const Support = () => {
                   chatMessages.map((msg, idx) => (
                     <div
                       key={idx}
-                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${
+                        msg.role === "user" ? "justify-end" : "justify-start"
+                      }`}
                     >
                       <div
                         className={`max-w-[80%] p-3 rounded-lg ${
-                          msg.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-card border border-border'
+                          msg.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card border border-border"
                         }`}
                       >
                         {msg.content}
@@ -270,9 +454,12 @@ const Support = () => {
                   placeholder="Type your message..."
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
                 />
-                <Button onClick={handleSendMessage} disabled={!chatMessage.trim()}>
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!chatMessage.trim()}
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
@@ -330,8 +517,12 @@ const Support = () => {
                       <Video className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">{video.title}</p>
-                      <p className="text-sm text-muted-foreground">{video.duration}</p>
+                      <p className="font-medium text-foreground">
+                        {video.title}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {video.duration}
+                      </p>
                     </div>
                   </div>
                   <Button variant="ghost" size="sm">

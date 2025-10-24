@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { AdminLayout } from "@/components/AdminLayout";
 import {
   Card,
@@ -41,19 +42,28 @@ import { Trash2, Plus, MessageSquare, User, Clock } from "lucide-react";
 import {
   useCreateTicketMutation,
   useGetAllTicketsQuery,
-  useGetTicketDetailByIdQuery,
+  useLazyGetTicketDetailByIdQuery,
   useReplyTicketMutation,
-  useGetRepliesQuery,
+  useLazyGetRepliesQuery,
   useGetUserTicketsQuery,
   useCloseTicketMutation,
   useLazyGetAllNotesByTicketIdQuery,
   useAddTicketNoteMutation,
   useDeleteNoteMutation,
+  useRateTicketMutation,
 } from "@/services/ticketService";
 import { useAllUsersQuery } from "../../services/adminUserService";
 import { useSelector } from "react-redux";
 
 const AdminSupport = () => {
+  const navigate = useNavigate();
+
+  const [status, setStatus] = useState("open");
+  const [replies, setReplies] = useState([]);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [ticket, setTicket] = useState(null);
+
   const { user, token, isAuthenticated } = useSelector(
     (state: any) => state.auth
   );
@@ -68,6 +78,10 @@ const AdminSupport = () => {
   const [newNote, setNewNote] = useState("");
   const [file, setFile] = useState(null);
   const [ticketId, setTicketId] = useState(null);
+  const bottomRef = useRef(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [rating, setRating] = useState("");
+  const [feedback, setFeedback] = useState("");
   const [newTicket, setNewTicket] = useState({
     user_id: "",
     subject: "",
@@ -141,15 +155,25 @@ const AdminSupport = () => {
     }
   };
 
+  const [getRepliesByTicketId] = useLazyGetRepliesQuery();
+
+  const [getTicketDetail, { data: ticketDetail }] =
+    useLazyGetTicketDetailByIdQuery();
   const handleViewTicket = async (ticket: any) => {
     try {
-      // Fetch notes dynamically
+      const result = await getTicketDetail(ticket.id).unwrap();
+      const t = result?.data;
+      console.log("Ticket Detail:", t.status);
+      setTicket(t);
+      setStatus(t.status);
+
       const { data: notes } = await getNotesByTicketId(ticket.id);
-      ``;
       // Update local state
       setTicketNotes(notes?.notes || []);
-      console.log("Viewing notes:", notes?.notes);
-
+      //console.log("Viewing notes:", notes?.notes);
+      const replies = await getRepliesByTicketId(ticket.id).unwrap();
+      //console.log("Replies:", replies);
+      setReplies(replies || []);
       // Set ticket and open modal
       setSelectedTicket(ticket);
       setDetailsDialogOpen(true);
@@ -223,11 +247,73 @@ const AdminSupport = () => {
     try {
       await deleteNote(noteId).unwrap();
       toast.success("Note deleted successfully!");
-       // Refresh the notes list after deleting
+      // Refresh the notes list after deleting
       const { data: updatedNotes } = await getNotesByTicketId(ticketId);
       setTicketNotes(updatedNotes?.notes || []);
     } catch (error) {
       toast.error("Failed to delete note");
+    }
+  };
+
+  const [closeTicket] = useCloseTicketMutation();
+
+  const handleCloseTicket = async () => {
+    if (window.confirm("Are you sure you want to close this ticket?")) {
+      try {
+        console.log("ticket", ticket.id);
+        await closeTicket(ticket.id).unwrap();
+        setStatus("closed");
+        toast.info("Ticket closed successfully");
+      } catch {
+        toast.error("Failed to close ticket");
+      }
+    }
+  };
+
+  const [replyTicket] = useReplyTicketMutation();
+
+  const handleReply = async (e) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append("ticket_id", ticket?.id);
+    formData.append("message", message);
+    if (file) formData.append("file", file);
+
+    setSubmitting(true);
+    try {
+      await replyTicket(formData).unwrap();
+      setMessage("");
+      setFile(null);
+      const replies = await getRepliesByTicketId(ticket.id).unwrap();
+      //console.log("Replies:", replies);
+      setReplies(replies || []);
+
+      toast.success("Reply posted successfully");
+    } catch {
+      toast.error("Failed to send reply");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getInitials = (name) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
+  };
+
+  const [rateTicket] = useRateTicketMutation();
+
+  const handleRatingSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await rateTicket({ id: ticket.id, rating, feedback }).unwrap();
+      toast.success("Thanks for your feedback!");
+      setTicket({ ...ticket, rating });
+    } catch {
+      toast.error("Could not submit rating");
     }
   };
 
@@ -540,6 +626,174 @@ const AdminSupport = () => {
                     <p className="text-sm whitespace-pre-wrap p-3 bg-muted/20 rounded-lg">
                       {selectedTicket.message || "No description provided"}
                     </p>
+                  </div>
+                </div>
+
+                {/* conversation section */}
+
+                <div className="row">
+                  {/* Ticket Conversation */}
+                  <div className="col-md-12">
+                    <div
+                      className="col-md-12 mx-auto p-4 bg-white"
+                      style={{
+                        border: "1px solid #f2efefff",
+                        boxShadow: "0 0px 3px rgba(0, 0, 0, 0.1)",
+                      }}
+                    >
+                      <div
+                        className="d-flex align-items-center justify-content-between mb-3 p-3"
+                        style={{
+                          backgroundColor: "#fafafa",
+                          borderRadius: "8px",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                        }}
+                      >
+                        <h3 className="text-center mb-0">
+                          Ticket Conversation
+                        </h3>
+                        {status == "open" && (
+                          <button
+                            onClick={handleCloseTicket}
+                            className="btn btn-sm btn-danger"
+                            style={{ height: "fit-content" }}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {error && (
+                        <div className="alert alert-danger px-2 py-1 text-center">
+                          {error}
+                        </div>
+                      )}
+
+                      <div className="px-3 pt-4">
+                        <div className="mb-4">
+                          {replies.map((reply) => (
+                            <div key={reply.id} className="d-flex mb-3">
+                              <div
+                                className="rounded-circle text-white d-flex justify-content-center align-items-center"
+                                style={{
+                                  width: 100,
+                                  height: 40,
+                                  fontWeight: "bold",
+                                  backgroundColor: "#d946ef",
+                                }}
+                              >
+                                {reply.user.name}
+                              </div>
+                              <div
+                                className={`ms-2 me-2 p-3 rounded shadow-sm ${
+                                  reply.name === "Admin"
+                                    ? "bg-light border"
+                                    : "bg-white border"
+                                }`}
+                                style={{ maxWidth: "85%" }}
+                              >
+                                <div className="mb-1">
+                                  <strong>{reply.user.name}</strong>{" "}
+                                  <small
+                                    className="text-muted"
+                                    style={{ fontSize: "0.8em", color: "#666" }}
+                                  >
+                                    {new Date(
+                                      reply.created_at
+                                    ).toLocaleString()}
+                                  </small>
+                                </div>
+                                <p className="mb-1">{reply.message}</p>
+
+                                {reply.file && (
+                                  <a
+                                    href={`http://localhost:5173/api/files/${reply.file}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    📎 {reply.file}
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          <div ref={bottomRef}></div>
+                        </div>
+
+                        {status === "open" ? (
+                          <form
+                            onSubmit={handleReply}
+                            encType="multipart/form-data"
+                            className="d-flex flex-column"
+                          >
+                            <textarea
+                              rows="4"
+                              placeholder="Type your reply..."
+                              className="form-control mb-3"
+                              value={message}
+                              onChange={(e) => setMessage(e.target.value)}
+                              required
+                            />
+                            <input
+                              type="file"
+                              className="form-control mb-2"
+                              onChange={(e) => setFile(e.target.files[0])}
+                            />
+                            <button
+                              className="btn text-white border-0 mt-4 mx-auto"
+                              style={{
+                                backgroundColor: "#d946ef",
+                                borderColor: "#d946ef",
+                              }}
+                              disabled={submitting}
+                            >
+                              {submitting ? (
+                                <div
+                                  className="spinner-border spinner-border-sm"
+                                  role="status"
+                                />
+                              ) : (
+                                "Send Reply"
+                              )}
+                            </button>
+                          </form>
+                        ) : (
+                          <div className="alert alert-secondary">
+                            This ticket is closed. No further replies allowed.
+                          </div>
+                        )}
+
+                        {status === "closed" && ticket?.rating == null && (
+                          <div className="mt-4">
+                            <h5>Rate your experience</h5>
+                            <form onSubmit={handleRatingSubmit}>
+                              <select
+                                className="form-select mb-2"
+                                value={rating}
+                                onChange={(e) => setRating(e.target.value)}
+                                required
+                              >
+                                <option value="">Select rating</option>
+                                <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                                <option value="4">⭐⭐⭐⭐ Good</option>
+                                <option value="3">⭐⭐⭐ Okay</option>
+                                <option value="2">⭐⭐ Poor</option>
+                                <option value="1">⭐ Terrible</option>
+                              </select>
+                              <textarea
+                                className="form-control mb-2"
+                                placeholder="Additional feedback (optional)"
+                                value={feedback}
+                                onChange={(e) => setFeedback(e.target.value)}
+                              />
+                              <button className="btn btn-success">
+                                Submit Rating
+                              </button>
+                            </form>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 

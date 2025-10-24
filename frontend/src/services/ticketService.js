@@ -12,6 +12,18 @@ export const ticketService = apiSlice.injectEndpoints({
       invalidatesTags: ["Tickets"],
     }),
 
+    rateTicket: builder.mutation({
+      query: ({ id, rating, feedback }) => ({
+        url: `rate/${id}`,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rating, feedback }),
+      }),
+      invalidatesTags: ["Tickets"],
+    }),
+
     // Get all tickets (admin)
     getAllTickets: builder.query({
       query: () => "all-tickets",
@@ -83,12 +95,13 @@ export const ticketService = apiSlice.injectEndpoints({
 export const {
   useCreateTicketMutation,
   useGetAllTicketsQuery,
-  useGetTicketDetailByIdQuery,
+  useLazyGetTicketDetailByIdQuery,
   useReplyTicketMutation,
-  useGetRepliesQuery,
+  useLazyGetRepliesQuery,
   useGetUserTicketsQuery,
   useCloseTicketMutation,
   useLazyGetAllNotesByTicketIdQuery,
   useAddTicketNoteMutation,
-  useDeleteNoteMutation
+  useDeleteNoteMutation,
+  useRateTicketMutation,
 } = ticketService;
