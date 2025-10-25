@@ -43,28 +43,33 @@ import {
   Upload,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import {useListEmailCampaignsQuery} from "../services/userEmailWarmupService";
-import {useSelector} from "react-redux"
+import {
+  useListEmailCampaignsQuery,
+  useAddSingleEmailCampaignMutation,
+} from "../services/userEmailWarmupService";
+import { useSelector } from "react-redux";
 
 const EmailWarmup = () => {
+  const [query, setQuery] = useState("");
+  const [sortConfig, setSortConfig] = useState({
+    key: "warmup_emails",
+    direction: "asc",
+  });
 
-   const [query, setQuery] = useState('');
-   const [sortConfig, setSortConfig] = useState({ key: 'warmup_emails', direction: "asc" });
-
-    const { user, token, isAuthenticated } = useSelector(
-      (state: any) => state.auth
-    );
+  const { user, token, isAuthenticated } = useSelector(
+    (state: any) => state.auth
+  );
 
   const { data, isLoading } = useListEmailCampaignsQuery({
-  user_id: user.id,
-  q: query,
-  sortKey: sortConfig.key,
-  sortDirection: sortConfig.direction,
-});
+    user_id: user.id,
+    q: query,
+    sortKey: sortConfig.key,
+    sortDirection: sortConfig.direction,
+  });
 
-const campaigns = data || [];
+  const campaigns = data || [];
 
-console.log("data",data);
+  console.log("data", data);
 
   const [stats, setStats] = useState({
     totalEmailsSent: 0,
@@ -72,14 +77,15 @@ console.log("data",data);
     spamEmails: 0,
     avgHealthScore: 0,
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploadMethod, setUploadMethod] = useState<"manual" | "csv">("manual");
   const [formData, setFormData] = useState({
-    campaign_name: "",
+    user_id:user.id,
+    cName: "",
     subject: "",
-    campaign_msg: "",
+    cMsg: "",
     first_name: "",
     last_name: "",
     smtp_username: "",
@@ -87,8 +93,8 @@ console.log("data",data);
     smtp_host: "",
     smtp_port: null,
     warmup_enabled: false,
-    daily_limit:null,
-    warmup_limit:null,
+    daily_limit: null,
+    warmup_limit: null,
   });
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -179,54 +185,60 @@ console.log("data",data);
     setLoading(false);
   };
 
-
   const validateForm = () => {
-  const requiredFields = [
-    "campaign_name",
-    "subject",
-    "campaign_msg",
-    "first_name",
-    "last_name",
-    "smtp_username",
-    "smtp_password",
-    "smtp_host",
-    "smtp_port",
-  ];
+    const requiredFields = [
+      "cName",
+      "subject",
+      "cMsg",
+      "first_name",
+      "last_name",
+      "smtp_username",
+      "smtp_password",
+      "smtp_host",
+      "smtp_port",
+    ];
 
-  for (const field of requiredFields) {
-    if (!formData[field] || formData[field].toString().trim() === "") {
-      alert(`Please enter ${field.replace(/_/g, " ")}`);
-      return false;
+    for (const field of requiredFields) {
+      if (!formData[field] || formData[field].toString().trim() === "") {
+        alert(`Please enter ${field.replace(/_/g, " ")}`);
+        return false;
+      }
     }
-  }
 
-  // Only validate warmup fields if enabled
-  if (formData.warmup_enabled) {
-    if (!formData.daily_limit) {
-      alert("Please enter daily limit");
-      return false;
+    // Only validate warmup fields if enabled
+    if (formData.warmup_enabled) {
+      if (!formData.daily_limit) {
+        alert("Please enter daily limit");
+        return false;
+      }
+      if (!formData.warmup_limit) {
+        alert("Please enter warmup limit");
+        return false;
+      }
     }
-    if (!formData.warmup_limit) {
-      alert("Please enter warmup limit");
-      return false;
-    }
-  }
 
-  return true;
-};
+    return true;
+  };
 
-
+  const [addSingleEmailCampaign] = useAddSingleEmailCampaignMutation();
   const handleAddAccount = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+    e.preventDefault();
+    setLoading(true);
 
-  // Validate all required fields
-  if (!validateForm()) {
-    setLoading(false);
-    return;
-  }
-};
-
+    // Validate all required fields
+    if (!validateForm()) {
+      setLoading(false);
+      return;
+    }
+    console.log(formData);
+    try {
+      await addSingleEmailCampaign(formData).unwrap();
+      toast.success("Email campaign added successfully!");
+    } catch (err) {
+      console.error("Error adding email campaign:", err);
+      toast.error("Failed to add email campaign.");
+    }
+  };
 
   const handleCsvUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -392,14 +404,14 @@ console.log("data",data);
                       <div className="space-y-2">
                         <Label htmlFor="Campaign">Campaign Name</Label>
                         <Input
-                          id="campaign_name"
+                          id="cName"
                           type="text"
                           placeholder="campaign name"
-                          value={formData.campaign_name}
+                          value={formData.cName}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
-                              campaign_name: e.target.value,
+                              cName: e.target.value,
                             })
                           }
                           required
@@ -426,13 +438,13 @@ console.log("data",data);
                           Campaign Message
                         </Label>
                         <Textarea
-                          id="campaign_msg"
+                          id="cMsg"
                           placeholder="campaign msg"
-                          value={formData.campaign_msg}
+                          value={formData.cMsg}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
-                              campaign_msg: e.target.value,
+                              cMsg: e.target.value,
                             })
                           }
                           required
@@ -813,17 +825,9 @@ console.log("data",data);
                       <TableCell className="font-medium">
                         {account.username}
                       </TableCell>
-                      <TableCell>
-                       {account.smtp_username}
-                      </TableCell>
-                      <TableCell>
-                       
-                            {account.warmup_emails} emails
-                         
-                      </TableCell>
-                      <TableCell>
-                        0%
-                      </TableCell>
+                      <TableCell>{account.smtp_username}</TableCell>
+                      <TableCell>{account.warmup_emails} emails</TableCell>
+                      <TableCell>0%</TableCell>
                       <TableCell>
                         <span className="font-medium text-foreground">
                           {account?.spam_email || 0}
