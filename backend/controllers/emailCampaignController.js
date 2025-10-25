@@ -186,4 +186,120 @@ const getAllEmailCampaigns = async (req, res) => {
   }
 };
 
-module.exports = { getAllEmailCampaigns };
+const getEmailCampaigns = async (req, res) => {
+    try {
+        const userId = parseInt(req.query.user_id);
+        const q = req.query.q || '';
+        const q1 = q.split(' ');
+        let sortKey = req.query.sortKey || 'id';
+        const sortDirection = req.query.sortDirection || 'ASC';
+        const p = parseInt(req.query.p) || 1;
+        const perPage = 10;
+        const offset = perPage * (p - 1);
+
+        if (!userId) {
+            return res.status(400).json({ error: 'User ID is required' });
+        }
+
+        if (sortKey === 'full_name') sortKey = 'first_name';
+
+        // Base where condition
+        let where = {};
+        if (userId !== 1) where.user_id = userId;
+
+        // Search
+        if (q) {
+            if (q1.length === 2) {
+                where = { 
+                    ...where, 
+                    first_name: { [Op.like]: `%${q1[0]}%` }, 
+                    last_name: { [Op.like]: `%${q1[1]}%` } 
+                };
+            } else {
+                where = { 
+                    ...where, 
+                    [Op.or]: [
+                        { first_name: { [Op.like]: `%${q}%` } },
+                        { last_name: { [Op.like]: `%${q}%` } },
+                        { smtp_username: { [Op.like]: `%${q}%` } }
+                    ] 
+                };
+            }
+        }
+
+        const campaigns = await Campaign.findAll({
+            where,
+            order: [[sortKey, sortDirection]],
+            offset,
+            limit: perPage
+        });
+
+        const campaignIds = campaigns.map(c => c.id);
+
+        // Fetch Email stats
+        const sendEmails = await EmailCampaignStatus.findAll({
+            attributes: [
+                'campaign_id',
+                [fn('SUM', col('is_send')), 'total_send'],
+                [fn('SUM', col('is_spam')), 'total_spam']
+            ],
+            where: {
+                campaign_id: { [Op.in]: campaignIds },
+                is_send: { [Op.ne]: 0 },
+                created_at: { [Op.between]: [dayjs().subtract(7, 'day').startOf('day').toDate(), dayjs().endOf('day').toDate()] }
+            },
+            group: ['campaign_id']
+        });
+
+        const todayRuns = await EmailCampaignStatus.findAll({
+            attributes: [
+                'campaign_id',
+                [fn('SUM', col('is_send')), 'today_run']
+            ],
+            where: {
+                campaign_id: { [Op.in]: campaignIds },
+                is_send: { [Op.ne]: 0 },
+                created_at: { [Op.gte]: dayjs().startOf('day').toDate() }
+            },
+            group: ['campaign_id']
+        });
+
+        const userIds = [...new Set(campaigns.map(c => c.user_id))];
+        const users = await User.findAll({ where: { id: userIds } });
+
+        const sendEmailsMap = {};
+        sendEmails.forEach(e => sendEmailsMap[e.campaign_id] = e.dataValues);
+
+        const todayRunsMap = {};
+        todayRuns.forEach(e => todayRunsMap[e.campaign_id] = e.dataValues);
+
+        const userMap = {};
+        users.forEach(u => userMap[u.id] = u.name);
+
+        const result = campaigns.map(c => {
+            const sendData = sendEmailsMap[c.id] || {};
+            const todayData = todayRunsMap[c.id] || {};
+            const totalEmails = parseInt(sendData.total_send) || 0;
+            const spamEmails = parseInt(sendData.total_spam) || 0;
+            const warmupPercentage = totalEmails > 0 ? Math.floor(((totalEmails - spamEmails) / totalEmails) * 100) : 0;
+
+            return {
+                ...c.toJSON(),
+                warmup_emails: warmupPercentage,
+                total_emails: totalEmails,
+                spam_email: spamEmails,
+                send_email: totalEmails,
+                todayrunCampaign: parseInt(todayData.today_run) || 0,
+                username: userMap[c.user_id] || null
+            };
+        });
+
+        res.json(result);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+module.exports = { getAllEmailCampaigns, getEmailCampaigns };

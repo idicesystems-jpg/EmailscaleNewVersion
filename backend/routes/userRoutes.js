@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const  path  = require("path");
-//const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "uploads/" });
 const router = express.Router();
 const authenticateToken = require("../middlewares/authMiddleware");
 const {
@@ -65,9 +65,9 @@ const {
 
 const { addNote, getNotes, updateNote, deleteNote} = require("../controllers/notesController");
 
-const { getAllEmailCampaigns } = require("../controllers/emailCampaignController");
+const { getAllEmailCampaigns, getEmailCampaigns } = require("../controllers/emailCampaignController");
 
-const { getAllSmtps, createSmtp } = require("../controllers/smtpAccountsController");
+const { getAllSmtps, createSmtp, createSmtpBulk } = require("../controllers/smtpAccountsController");
 
 // Routes
 router.post("/login", login);
@@ -136,8 +136,10 @@ router.delete("/Notedelete/:noteId",deleteNote);
 
 
 router.post("/get-all-email-campaigns", getAllEmailCampaigns);
+router.post("/list-email-campaigns", getEmailCampaigns);
 
 router.get('/smtps', getAllSmtps);
 router.post('/smtps', createSmtp);
+router.post('/smtps_bulk_import', createSmtpBulk);
 
 module.exports = router;
