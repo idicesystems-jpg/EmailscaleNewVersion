@@ -12,9 +12,31 @@ export const ticketService = apiSlice.injectEndpoints({
       invalidatesTags: ["Tickets"],
     }),
 
+    rateTicket: builder.mutation({
+      query: ({ id, rating, feedback }) => ({
+        url: `rate/${id}`,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rating, feedback }),
+      }),
+      invalidatesTags: ["Tickets"],
+    }),
+
     // Get all tickets (admin)
     getAllTickets: builder.query({
-      query: () => "all-tickets",
+      query: ({ page = 1, limit = 10, status, priority }) => {
+        const queryParams = new URLSearchParams();
+
+        queryParams.append("page", page);
+        queryParams.append("limit", limit);
+
+        if (status) queryParams.append("status", status);
+        if (priority) queryParams.append("priority", priority);
+
+        return `all-tickets?${queryParams.toString()}`;
+      },
       providesTags: ["Tickets"],
     }),
 
@@ -56,7 +78,17 @@ export const ticketService = apiSlice.injectEndpoints({
 
     // Get all tickets of logged-in user
     getUserTickets: builder.query({
-      query: () => "user-tickets",
+      query: ({ page = 1, limit = 10, status, priority }) => {
+        const queryParams = new URLSearchParams();
+
+        queryParams.append("page", page);
+        queryParams.append("limit", limit);
+
+        if (status) queryParams.append("status", status);
+        if (priority) queryParams.append("priority", priority);
+
+        return `user-tickets?${queryParams.toString()}`;
+      },
       providesTags: ["Tickets"],
     }),
 
@@ -83,12 +115,13 @@ export const ticketService = apiSlice.injectEndpoints({
 export const {
   useCreateTicketMutation,
   useGetAllTicketsQuery,
-  useGetTicketDetailByIdQuery,
+  useLazyGetTicketDetailByIdQuery,
   useReplyTicketMutation,
-  useGetRepliesQuery,
+  useLazyGetRepliesQuery,
   useGetUserTicketsQuery,
   useCloseTicketMutation,
   useLazyGetAllNotesByTicketIdQuery,
   useAddTicketNoteMutation,
-  useDeleteNoteMutation
+  useDeleteNoteMutation,
+  useRateTicketMutation,
 } = ticketService;

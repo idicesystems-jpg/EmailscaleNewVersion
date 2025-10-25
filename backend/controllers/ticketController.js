@@ -502,6 +502,7 @@ const replyTicket = async (req, res) => {
   try {
     const { ticket_id, message } = req.body;
     const userId = req.user.id;
+    //console.log("req.file", req.file);
     const file = req.file ? req.file.filename : null;
 
     // 1️⃣ Insert reply
