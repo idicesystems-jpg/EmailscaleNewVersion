@@ -65,7 +65,7 @@ const {
 
 const { addNote, getNotes, updateNote, deleteNote} = require("../controllers/notesController");
 
-const { getAllEmailCampaigns, getEmailCampaigns } = require("../controllers/emailCampaignController");
+const { getAllEmailCampaigns, getEmailCampaigns, singleEmailCampaign, emailCampaign } = require("../controllers/emailCampaignController");
 
 const { getAllSmtps, createSmtp, createSmtpBulk } = require("../controllers/smtpAccountsController");
 
@@ -137,6 +137,8 @@ router.delete("/Notedelete/:noteId",deleteNote);
 
 router.post("/get-all-email-campaigns", getAllEmailCampaigns);
 router.post("/list-email-campaigns", getEmailCampaigns);
+router.post('/single-email-campaign', singleEmailCampaign);
+router.post('/email-campaign', emailCampaign);
 
 router.get('/smtps', getAllSmtps);
 router.post('/smtps', createSmtp);

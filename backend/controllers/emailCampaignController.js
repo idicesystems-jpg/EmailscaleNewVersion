@@ -5,6 +5,8 @@ const EmailCampaign = require('../models/EmailCampaign');
 const EmailCampaignStatus  = require('../models/EmailCampaignStatus');
 const { Op, fn, col, literal } = require("sequelize");
 const dayjs = require("dayjs");
+const imaps = require('imap-simple');
+
 
 const getAllEmailCampaigns = async (req, res) => {
   try {
@@ -302,4 +304,176 @@ const getEmailCampaigns = async (req, res) => {
     }
 };
 
-module.exports = { getAllEmailCampaigns, getEmailCampaigns };
+const singleEmailCampaign = async (req, res) => {
+    try {
+        const {
+            user_id,
+            smtp_username,
+            smtp_password,
+            smtp_host,
+            smtp_port,
+            cName,
+            subject,
+            cMsg,
+            first_name,
+            last_name,
+            warmup_enabled,
+            warmup_limit
+        } = req.body;
+
+        if (!user_id || !smtp_username || !smtp_password || !smtp_host) {
+            return res.status(400).json({ message: 'Required fields missing' });
+        }
+
+        // Check if campaign already exists
+        const existingRecord = await Campaign.findOne({ where: { smtp_username } });
+        if (existingRecord) {
+            return res.status(400).json({ message: 'Email account already exists' });
+        }
+
+        // IMAP configuration
+        const config = {
+            imap: {
+                user: smtp_username,
+                password: smtp_password,
+                host: smtp_host,
+                port: smtp_port || 993,
+                tls: true,
+                tlsOptions: { rejectUnauthorized: false },
+                authTimeout: 5000
+            }
+        };
+
+        // Try to connect to IMAP
+        try {
+            const connection = await imaps.connect(config);
+            await connection.end(); // Close connection
+        } catch (err) {
+            return res.status(400).json({ message: `IMAP connection failed: ${err.message}` });
+        }
+
+        // Create campaign record
+        await Campaign.create({
+            campaign_name: cName,
+            subject,
+            campaign_message: cMsg,
+            first_name,
+            last_name,
+            smtp_username,
+            smtp_password,
+            smtp_host,
+            smtp_port: smtp_port || 993,
+            daily_limit: 10,
+            warmup_enabled,
+            warmup_limit,
+            user_id
+        });
+
+        return res.status(200).json({ message: 'Email account added successfully' });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+const emailCampaign = async (req, res) => {
+    const { row, user_id, cName, subject, cMsg } = req.body;
+
+    if (!user_id) {
+        return res.status(400).json({ error: 'User ID is missing' });
+    }
+
+    if (!Array.isArray(row) || row.length === 0) {
+        return res.status(400).json({ error: 'Data is required and should be an array' });
+    }
+
+    try {
+        let ids = '';
+
+        // For simplicity, assuming row is a single object, same as your Laravel code
+        const r = row; // if multiple rows, wrap in loop
+
+        // Check for duplicate email
+        const existingRecord = await Campaign.findOne({ where: { smtp_username: r['SMTP Username'] } });
+
+        if (!existingRecord) {
+            const host = r['SMTP Host'];
+            const port = 993; // IMAP SSL
+            const ssl = true;
+
+            // SMTP IMAP check
+            const smtpConfig = {
+                imap: {
+                    user: r['SMTP Username'],
+                    password: r['SMTP Password'],
+                    host,
+                    port,
+                    tls: true,
+                    tlsOptions: { rejectUnauthorized: false },
+                    authTimeout: 5000
+                }
+            };
+
+            let smtpConnected = false;
+            try {
+                const smtpConn = await imaps.connect(smtpConfig);
+                await smtpConn.end();
+                smtpConnected = true;
+            } catch (err) {
+                smtpConnected = false;
+            }
+
+            // IMAP check
+            const imapConfig = {
+                imap: {
+                    user: r['IMAP Username'],
+                    password: r['IMAP Password'],
+                    host,
+                    port,
+                    tls: true,
+                    tlsOptions: { rejectUnauthorized: false },
+                    authTimeout: 5000
+                }
+            };
+
+            let imapConnected = false;
+            try {
+                const imapConn = await imaps.connect(imapConfig);
+                await imapConn.end();
+                imapConnected = true;
+            } catch (err) {
+                imapConnected = false;
+            }
+
+            if (smtpConnected && imapConnected) {
+                const campaign = await Campaign.create({
+                    campaign_name: cName,
+                    subject,
+                    campaign_message: cMsg,
+                    first_name: r['First Name'],
+                    last_name: r['Last Name'],
+                    smtp_username: r['IMAP Username'],
+                    smtp_password: r['IMAP Password'],
+                    smtp_host: r['IMAP Host'],
+                    smtp_port: r['SMTP Port'],
+                    daily_limit: 10,
+                    warmup_enabled: r['Warmup Enabled'],
+                    warmup_limit: r['Warmup Limit'],
+                    user_id
+                });
+                ids = campaign.id;
+                return res.status(200).json({ status: true, message: 'IMAP connection successful: ' + r['SMTP Username'], ids });
+            } else {
+                return res.status(200).json({ status: false, message: 'IMAP connection failed: ' + r['SMTP Username'], ids });
+            }
+        } else {
+            return res.status(200).json({ status: true, message: 'Already exist: ' + r['SMTP Username'], ids });
+        }
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed to upload data', details: err.message });
+    }
+};
+module.exports = { getAllEmailCampaigns, getEmailCampaigns, singleEmailCampaign, emailCampaign };
