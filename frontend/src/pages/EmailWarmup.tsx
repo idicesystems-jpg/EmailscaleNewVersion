@@ -62,13 +62,17 @@ const EmailWarmup = () => {
   sortDirection: sortConfig.direction,
 });
 
+const campaigns = data || [];
+
+console.log("data",data);
+
   const [stats, setStats] = useState({
     totalEmailsSent: 0,
     inboxRate: 0,
     spamEmails: 0,
     avgHealthScore: 0,
   });
-  const [warmupAccounts, setWarmupAccounts] = useState<any[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploadMethod, setUploadMethod] = useState<"manual" | "csv">("manual");
@@ -147,7 +151,7 @@ const EmailWarmup = () => {
         };
       }) || [];
 
-    setWarmupAccounts(accountsWithStats);
+    //setcampaigns(accountsWithStats);
 
     // Calculate overall stats
     const totalSent = allSends?.length || 0;
@@ -777,11 +781,12 @@ const EmailWarmup = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {/* {loading ? (
               <div className="flex justify-center p-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : warmupAccounts.length === 0 ? (
+            ) :  */}
+            {campaigns.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Flame className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>
@@ -793,86 +798,50 @@ const EmailWarmup = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Progress</TableHead>
+                    <TableHead>In Warmup</TableHead>
+                    <TableHead>Inbox Placement</TableHead>
+                    <TableHead>Saved from Spam</TableHead>
                     <TableHead>Health Score</TableHead>
-                    <TableHead>Emails Sent</TableHead>
-                    <TableHead>Inbox Rate</TableHead>
-                    <TableHead>Spam Count</TableHead>
-                    <TableHead>Daily Limit</TableHead>
-                    <TableHead>Sent Today</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {warmupAccounts.map((account) => (
+                  {campaigns.map((account) => (
                     <TableRow key={account.id}>
                       <TableCell className="font-medium">
-                        {account.inboxes?.email_address}
+                        {account.username}
                       </TableCell>
                       <TableCell>
-                        <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            account.warmup_status === "active"
-                              ? "bg-green-500/20 text-green-500"
-                              : account.warmup_status === "paused"
-                              ? "bg-orange-500/20 text-orange-500"
-                              : "bg-blue-500/20 text-blue-500"
-                          }`}
-                        >
-                          {account.warmup_status}
-                        </span>
+                       {account.smtp_username}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress
-                            value={Number(account.progress_percentage)}
-                            className="w-20 h-2"
-                          />
-                          <span className="text-xs text-muted-foreground">
-                            {account.progress_percentage}%
-                          </span>
-                        </div>
+                       
+                            {account.warmup_emails} emails
+                         
                       </TableCell>
                       <TableCell>
-                        <span
-                          className={`font-semibold ${
-                            Number(account.inboxes?.health_score) >= 80
-                              ? "text-green-500"
-                              : Number(account.inboxes?.health_score) >= 60
-                              ? "text-orange-500"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {account.inboxes?.health_score || 0}%
-                        </span>
+                        0%
                       </TableCell>
                       <TableCell>
                         <span className="font-medium text-foreground">
-                          {account.stats?.totalSent || 0}
+                          {account?.spam_email || 0}
                         </span>
                       </TableCell>
                       <TableCell>
                         <span
                           className={`font-semibold ${
-                            account.stats?.inboxRate >= 80
+                            account.warmup_emails >= 80
                               ? "text-green-500"
-                              : account.stats?.inboxRate >= 60
+                              : account.warmup_emails >= 60
                               ? "text-orange-500"
                               : "text-red-500"
                           }`}
                         >
-                          {account.stats?.inboxRate || 0}%
+                          {account.warmup_emails || 0}%
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <span className="text-red-500 font-medium">
-                          {account.stats?.spamCount || 0}
-                        </span>
-                      </TableCell>
-                      <TableCell>{account.daily_limit}</TableCell>
-                      <TableCell>{account.current_daily_sent}</TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -880,11 +849,11 @@ const EmailWarmup = () => {
                           onClick={() =>
                             handleToggleStatus(
                               account.id,
-                              account.warmup_status
+                              account.warmup_enabled
                             )
                           }
                         >
-                          {account.warmup_status === "active" ? (
+                          {account.warmup_enabled === "TRUE" ? (
                             <Pause className="h-4 w-4" />
                           ) : (
                             <Play className="h-4 w-4" />

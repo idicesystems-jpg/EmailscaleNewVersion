@@ -14,7 +14,10 @@ export const userEmailWarmupService = apiSlice.injectEndpoints({
         if (params.sortDirection)
           queryParams.append("sortDirection", params.sortDirection);
 
-        return `list-email-campaigns?${queryParams.toString()}`;
+        return {
+          url: `list-email-campaigns?${queryParams.toString()}`,
+          method: "POST",
+        };
       },
       providesTags: ["EmailCampaigns"],
     }),
