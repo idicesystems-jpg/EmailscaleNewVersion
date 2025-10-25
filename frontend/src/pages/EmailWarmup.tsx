@@ -41,13 +41,17 @@ import {
   Play,
   Pause,
   Upload,
+  Search,
+  Trash2
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useListEmailCampaignsQuery,
   useAddSingleEmailCampaignMutation,
+  useGetAllEmailCampaignsQuery,
 } from "../services/userEmailWarmupService";
 import { useSelector } from "react-redux";
+import Pagination from "../components/Pagination";
 
 const EmailWarmup = () => {
   const [query, setQuery] = useState("");
@@ -56,20 +60,32 @@ const EmailWarmup = () => {
     direction: "asc",
   });
 
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+
   const { user, token, isAuthenticated } = useSelector(
     (state: any) => state.auth
   );
 
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState("");
+
   const { data, isLoading } = useListEmailCampaignsQuery({
+    page,
+    limit,
     user_id: user.id,
-    q: query,
+    q: search,
     sortKey: sortConfig.key,
     sortDirection: sortConfig.direction,
   });
 
   const campaigns = data || [];
 
-  console.log("data", data);
+  const { data: allEmailCounter } = useGetAllEmailCampaignsQuery({
+    user_id: user.id,
+  });
+
+  console.log("allEmailCounter", allEmailCounter);
 
   const [stats, setStats] = useState({
     totalEmailsSent: 0,
@@ -82,7 +98,7 @@ const EmailWarmup = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploadMethod, setUploadMethod] = useState<"manual" | "csv">("manual");
   const [formData, setFormData] = useState({
-    user_id:user.id,
+    user_id: user.id,
     cName: "",
     subject: "",
     cMsg: "",
@@ -358,6 +374,26 @@ const EmailWarmup = () => {
       fetchData();
     }
   };
+
+
+   const handleBulkDelete = async () => {
+      if (selectedRows.length === 0) {
+        toast.error("No accounts selected");
+        return;
+      }
+  
+      if (!confirm(`Delete ${selectedRows.length} selected accounts?`)) return;
+  
+       await bulkDeleteWarmupEmail(selectedRows).unwrap();
+  
+      if (error) {
+        toast.error("Error deleting accounts");
+      } else {
+        toast.success(`${selectedRows.length} accounts deleted`);
+        setSelectedRows([]);
+        //fetchPoolAccounts();
+      }
+    };
 
   return (
     <DashboardLayout>
@@ -721,7 +757,7 @@ const EmailWarmup = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
-                {stats.totalEmailsSent}
+                {allEmailCounter?.total_emails_sent}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Total warmup emails
@@ -738,7 +774,7 @@ const EmailWarmup = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-500">
-                {stats.inboxRate}%
+                {allEmailCounter?.inbox_placement_7_days}%
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Landing in inbox
@@ -755,7 +791,7 @@ const EmailWarmup = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-500">
-                {stats.spamEmails}
+                {allEmailCounter?.total_spam_emails}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Marked as spam
@@ -772,7 +808,7 @@ const EmailWarmup = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-500">
-                {stats.avgHealthScore}%
+                {allEmailCounter?.average_health_score_7_days}%
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Average across accounts
@@ -784,13 +820,42 @@ const EmailWarmup = () => {
         {/* Connected Accounts */}
         <Card className="border-border">
           <CardHeader>
-            <CardTitle className="flex items-center text-foreground">
-              <Flame className="h-5 w-5 mr-2 text-primary" />
-              Connected Accounts
-            </CardTitle>
-            <CardDescription>
-              Monitor warmup progress for all accounts
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center text-foreground">
+                  <Flame className="h-5 w-5 mr-2 text-primary" />
+                  Connected Accounts
+                </CardTitle>
+                <CardDescription>
+                  Monitor warmup progress for all accounts
+                </CardDescription>
+              </div>
+              <div>
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1); // Reset to first page on new search
+                  }}
+                  className="pl-10"
+                />
+              </div>
+              <div className="relative w-72">
+                {selectedRows.length > 0 && (
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={handleBulkDelete}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete Selected ({selectedRows.length})
+                                      </Button>
+                                    )}
+                <Button> Download CSV</Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {/* {loading ? (
@@ -807,67 +872,108 @@ const EmailWarmup = () => {
                 </p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>In Warmup</TableHead>
-                    <TableHead>Inbox Placement</TableHead>
-                    <TableHead>Saved from Spam</TableHead>
-                    <TableHead>Health Score</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {campaigns.map((account) => (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-medium">
-                        {account.username}
-                      </TableCell>
-                      <TableCell>{account.smtp_username}</TableCell>
-                      <TableCell>{account.warmup_emails} emails</TableCell>
-                      <TableCell>0%</TableCell>
-                      <TableCell>
-                        <span className="font-medium text-foreground">
-                          {account?.spam_email || 0}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`font-semibold ${
-                            account.warmup_emails >= 80
-                              ? "text-green-500"
-                              : account.warmup_emails >= 60
-                              ? "text-orange-500"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {account.warmup_emails || 0}%
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            handleToggleStatus(
-                              account.id,
-                              account.warmup_enabled
-                            )
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedRows?.length === campaigns?.data?.length
                           }
-                        >
-                          {account.warmup_enabled === "TRUE" ? (
-                            <Pause className="h-4 w-4" />
-                          ) : (
-                            <Play className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableCell>
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRows(
+                                campaigns?.data?.map((a) => a.id)
+                              );
+                            } else {
+                              setSelectedRows([]);
+                            }
+                          }}
+                        />
+                      </TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>In Warmup</TableHead>
+                      <TableHead>Inbox Placement</TableHead>
+                      <TableHead>Saved from Spam</TableHead>
+                      <TableHead>Health Score</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {campaigns?.data.map((account) => (
+                      <TableRow key={account.id}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.includes(account.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRows([...selectedRows, account.id]);
+                              } else {
+                                setSelectedRows(
+                                  selectedRows.filter((id) => id !== account.id)
+                                );
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {account.username}
+                        </TableCell>
+                        <TableCell>{account.smtp_username}</TableCell>
+                        <TableCell>{account.warmup_emails} emails</TableCell>
+                        <TableCell>0%</TableCell>
+                        <TableCell>
+                          <span className="font-medium text-foreground">
+                            {account?.spam_email || 0}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`font-semibold ${
+                              account.warmup_emails >= 80
+                                ? "text-green-500"
+                                : account.warmup_emails >= 60
+                                ? "text-orange-500"
+                                : "text-red-500"
+                            }`}
+                          >
+                            {account.warmup_emails || 0}%
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleToggleStatus(
+                                account.id,
+                                account.warmup_enabled
+                              )
+                            }
+                          >
+                            {account.warmup_enabled === "TRUE" ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {/* Pagination Controls */}
+                <Pagination
+                  page={page}
+                  setPage={setPage}
+                  limit={limit}
+                  total={data?.total}
+                />
+              </>
             )}
           </CardContent>
         </Card>
