@@ -1,0 +1,2 @@
+SMTP Username,SMTP Password,IMAP Username,IMAP Password,SMTP Host,SMTP Port,IMAP Host,First Name,Last Name,Warmup Enabled,Warmup Limit
+example@gmail.com,password,example@gmail.com,password,imap.gmail.com,993,imap.gmail.com,John,Doe,true,5

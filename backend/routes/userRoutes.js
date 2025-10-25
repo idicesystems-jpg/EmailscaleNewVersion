@@ -1,6 +1,6 @@
 const express = require("express");
 const multer = require("multer");
-const  path  = require("path");
+const path = require("path");
 const upload = multer({ dest: "uploads/" });
 const router = express.Router();
 const authenticateToken = require("../middlewares/authMiddleware");
@@ -32,7 +32,7 @@ const {
   destroyDomain,
   exportDomainsCsv,
   checkAlternateDomainAvailability,
-  checkDomainAvailability
+  checkDomainAvailability,
 } = require("../controllers/domainController");
 
 const {
@@ -63,18 +63,35 @@ const {
   markNotificationsRead,
 } = require("../controllers/ticketController");
 
-const { addNote, getNotes, updateNote, deleteNote} = require("../controllers/notesController");
+const {
+  addNote,
+  getNotes,
+  updateNote,
+  deleteNote,
+} = require("../controllers/notesController");
 
-const { getAllEmailCampaigns, getEmailCampaigns, singleEmailCampaign, emailCampaign } = require("../controllers/emailCampaignController");
+const {
+  getAllEmailCampaigns,
+  getEmailCampaigns,
+  singleEmailCampaign,
+  emailCampaign,
+  updateCampaignDetails,
+  deleteCampaigns,
+  deleteCampaign,
+} = require("../controllers/emailCampaignController");
 
-const { getAllSmtps, createSmtp, createSmtpBulk } = require("../controllers/smtpAccountsController");
+const {
+  getAllSmtps,
+  createSmtp,
+  createSmtpBulk,
+} = require("../controllers/smtpAccountsController");
 
 // Routes
 router.post("/login", login);
 
 router.use(authenticateToken);
 
-router.post("/register",authenticateToken, register);
+router.post("/register", authenticateToken, register);
 router.get("/users", getUsers);
 router.get("/all-users", getUsersWithoutPagination);
 router.put("/update-user/:id", updateUser);
@@ -98,8 +115,11 @@ router.put("/domains/:id/status", updateDomainStatus);
 router.delete("/domains/:id", destroyDomain);
 router.get("/export-domains", exportDomainsCsv);
 
-router.post('/checkAlternateDomainAvailability', checkAlternateDomainAvailability);
-router.post('/check-domain-availability', checkDomainAvailability);
+router.post(
+  "/checkAlternateDomainAvailability",
+  checkAlternateDomainAvailability
+);
+router.post("/check-domain-availability", checkDomainAvailability);
 
 //emailWarmup Routes.
 router.get("/email-provider-counts", getEmailProviderCounts);
@@ -130,18 +150,20 @@ router.post("/notifications/mark-read/:email", markNotificationsRead);
 
 // notesController routes
 router.post("/ticket-notes/:ticketId", addNote);
-router.get("/all-notes/:ticketId",getNotes);
-router.put("/update-notes/:noteId",updateNote);
-router.delete("/Notedelete/:noteId",deleteNote);
-
+router.get("/all-notes/:ticketId", getNotes);
+router.put("/update-notes/:noteId", updateNote);
+router.delete("/Notedelete/:noteId", deleteNote);
 
 router.post("/get-all-email-campaigns", getAllEmailCampaigns);
 router.post("/list-email-campaigns", getEmailCampaigns);
-router.post('/single-email-campaign', singleEmailCampaign);
-router.post('/email-campaign', emailCampaign);
+router.post("/single-email-campaign", singleEmailCampaign);
+router.post("/email-campaign", upload.single("file"), emailCampaign);
+router.put("/update-campaign", updateCampaignDetails);
+router.post("/delete_campaigns", deleteCampaigns);
+router.post("/delete_campaign", deleteCampaign);
 
-router.get('/smtps', getAllSmtps);
-router.post('/smtps', createSmtp);
-router.post('/smtps_bulk_import', createSmtpBulk);
+router.get("/smtps", getAllSmtps);
+router.post("/smtps", createSmtp);
+router.post("/smtps_bulk_import", createSmtpBulk);
 
 module.exports = router;
