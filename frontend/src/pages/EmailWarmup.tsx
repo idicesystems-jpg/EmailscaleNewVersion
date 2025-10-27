@@ -42,13 +42,15 @@ import {
   Pause,
   Upload,
   Search,
-  Trash2
+  Trash2,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useListEmailCampaignsQuery,
   useAddSingleEmailCampaignMutation,
   useGetAllEmailCampaignsQuery,
+  useDeleteCampaignsMutation,
+  useDeleteCampaignMutation,
 } from "../services/userEmailWarmupService";
 import { useSelector } from "react-redux";
 import Pagination from "../components/Pagination";
@@ -84,8 +86,6 @@ const EmailWarmup = () => {
   const { data: allEmailCounter } = useGetAllEmailCampaignsQuery({
     user_id: user.id,
   });
-
-  console.log("allEmailCounter", allEmailCounter);
 
   const [stats, setStats] = useState({
     totalEmailsSent: 0,
@@ -375,25 +375,36 @@ const EmailWarmup = () => {
     }
   };
 
+  const [deleteCampaigns] = useDeleteCampaignsMutation();
+  const handleBulkDelete = async () => {
+    if (selectedRows.length === 0) {
+      toast.error("No accounts selected");
+      return;
+    }
 
-   const handleBulkDelete = async () => {
-      if (selectedRows.length === 0) {
-        toast.error("No accounts selected");
-        return;
-      }
-  
-      if (!confirm(`Delete ${selectedRows.length} selected accounts?`)) return;
-  
-       await bulkDeleteWarmupEmail(selectedRows).unwrap();
-  
-      if (error) {
-        toast.error("Error deleting accounts");
-      } else {
-        toast.success(`${selectedRows.length} accounts deleted`);
-        setSelectedRows([]);
-        //fetchPoolAccounts();
-      }
-    };
+    if (!confirm(`Delete ${selectedRows.length} selected accounts?`)) return;
+
+    try {
+      await deleteCampaigns({ ids: selectedRows }).unwrap();
+      toast.success(`${selectedRows.length} accounts deleted`);
+      setSelectedRows([]);
+    } catch (err) {
+      toast.error("Failed to delete campaign(s)");
+    }
+  };
+
+  const [deleteCampaign] = useDeleteCampaignMutation();
+  const handleDeleteCampignAccount = async (id: string) => {
+    alert(id);
+    if (!confirm("Are you sure you want to delete this email account?")) return;
+    try {
+      await deleteCampaign(id).unwrap();
+      toast.success("Email account deleted successfully!");
+    } catch (error) {
+      console.error("Delete failed:", error);
+      toast.error("Failed to delete email!");
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -844,15 +855,17 @@ const EmailWarmup = () => {
               </div>
               <div className="relative w-72">
                 {selectedRows.length > 0 && (
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={handleBulkDelete}
-                                      >
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Delete Selected ({selectedRows.length})
-                                      </Button>
-                                    )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Selected ({selectedRows.length})
+                  </Button>
+                )}
+                </div>
+                <div>
                 <Button> Download CSV</Button>
               </div>
             </div>
@@ -900,6 +913,7 @@ const EmailWarmup = () => {
                       <TableHead>Saved from Spam</TableHead>
                       <TableHead>Health Score</TableHead>
                       <TableHead>Actions</TableHead>
+                      <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -960,6 +974,17 @@ const EmailWarmup = () => {
                             ) : (
                               <Play className="h-4 w-4" />
                             )}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleDeleteCampignAccount(account.id)
+                            }
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </TableCell>
                       </TableRow>

@@ -104,6 +104,7 @@ const login = async (req, res) => {
         ghl_tool: user.ghl_tool,
         ghl_apikey: user.ghl_apikey,
         google2fa_secret: user.google2fa_secret,
+        phone: user.phone,
       },
       emailscale_token: token,
       ...google2fa_response,
