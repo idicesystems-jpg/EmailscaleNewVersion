@@ -30,7 +30,12 @@ const InboxOrdering = () => {
     { firstName: '', lastName: '', prefix: '', domain: '' },
     { firstName: '', lastName: '', prefix: '', domain: '' },
     { firstName: '', lastName: '', prefix: '', domain: '' }
+
   ]);
+
+  console.log("inboxCount",inboxCount);
+  console.log("brandNames", brandNames);
+  console.log("selectedExtensions",selectedExtensions);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userPackage, setUserPackage] = useState<string>('starter');
   const [currentInboxCount, setCurrentInboxCount] = useState(0);
