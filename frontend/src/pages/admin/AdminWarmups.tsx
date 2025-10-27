@@ -293,9 +293,6 @@ const AdminWarmups = () => {
   const [deleteWarmupEmail] = useDeleteWarmupEmailMutation();
   const handleDeletePoolAccount = async (id: string) => {
     if (!confirm("Delete this account from the pool?")) return;
-
-    const { error } = await supabase.from("warmup_pool").delete().eq("id", id);
-
     try {
       await deleteWarmupEmail(id).unwrap();
       toast.success("Email deleted successfully!");

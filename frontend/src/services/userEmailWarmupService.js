@@ -40,6 +40,26 @@ export const userEmailWarmupService = apiSlice.injectEndpoints({
   providesTags: ["EmailCampaigns"],
 }),
 
+deleteCampaigns: builder.mutation({
+  query: (data) => ({
+    url: "delete_campaigns",
+    method: "POST",
+    body: data,
+  }),
+  invalidatesTags: ["EmailCampaigns"],
+}),
+
+deleteCampaign: builder.mutation({
+  query: (id) => ({
+    url: "delete_campaign",
+    method: "POST",
+    body: {id},
+  }),
+  invalidatesTags: ["EmailCampaigns"],
+}),
+
+
+
 
 
 
@@ -112,8 +132,9 @@ export const {
   useListEmailCampaignsQuery,
   useAddSingleEmailCampaignMutation,
   useGetAllEmailCampaignsQuery,
+  useDeleteCampaignsMutation,
+  useDeleteCampaignMutation,
 
-  
 
   useDeleteWarmupEmailMutation,
   useDeleteEmailAccountsMutation,

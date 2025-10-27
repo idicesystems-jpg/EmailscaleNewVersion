@@ -6,10 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Mail, Plus, Globe, CreditCard, User, AtSign, AlertCircle, CheckCircle2, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 const InboxOrdering = () => {
-  const [step, setStep] = useState<'domains' | 'inboxes'>('domains');
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [step, setStep] = useState<'domains' | 'payment' | 'inboxes'>('domains');
   const [inboxCount, setInboxCount] = useState(9);
   const [brandNames, setBrandNames] = useState(['']);
   const [selectedExtensions, setSelectedExtensions] = useState<string[]>([]);
@@ -26,6 +31,48 @@ const InboxOrdering = () => {
     { firstName: '', lastName: '', prefix: '', domain: '' },
     { firstName: '', lastName: '', prefix: '', domain: '' }
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userPackage, setUserPackage] = useState<string>('starter');
+  const [currentInboxCount, setCurrentInboxCount] = useState(0);
+  
+  const packageLimits = {
+    starter: 30,
+    professional: 100,
+    unlimited: 999999
+  };
+
+  useEffect(() => {
+    checkUserPackageAndInboxes();
+  }, []);
+
+  const checkUserPackageAndInboxes = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('subscription_plan')
+      .eq('id', user.id)
+      .single();
+
+    const { count } = await supabase
+      .from('inboxes')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    setUserPackage(profile?.subscription_plan || 'starter');
+    setCurrentInboxCount(count || 0);
+  };
+
+  const getRemainingInboxes = () => {
+    const limit = packageLimits[userPackage as keyof typeof packageLimits] || 30;
+    return limit - currentInboxCount;
+  };
+
+  const canOrderInboxes = (count: number) => {
+    const remaining = getRemainingInboxes();
+    return count <= remaining;
+  };
 
   // Generate smart email prefix suggestions based on first/last name
   const generateEmailPrefixes = (first: string, last: string): string[] => {
@@ -196,6 +243,132 @@ const InboxOrdering = () => {
     setEmailAddresses(newAddresses);
   };
 
+  const handleCompleteSetup = async () => {
+    setIsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to complete setup",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check package limits
+      const totalInboxesToCreate = selectedDomains.length * Math.min(emailAddresses.length, 3);
+      if (!canOrderInboxes(totalInboxesToCreate)) {
+        toast({
+          title: "Package Limit Exceeded",
+          description: `You can only create ${getRemainingInboxes()} more inbox${getRemainingInboxes() === 1 ? '' : 'es'} with your ${userPackage} plan. Please upgrade your package or reduce the number of inboxes.`,
+          variant: "destructive"
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate that we have email prefixes
+      if (sameEmailsForAllDomains && emailAddresses.some(email => !email.prefix.trim())) {
+        toast({
+          title: "Error",
+          description: "Please fill in all email prefixes",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Step 1: Create domains
+      const domainRecords = selectedDomains.map(sel => ({
+        domain_name: `${sel.brand}${sel.extension}`,
+        user_id: user.id,
+        status: 'pending',
+        notes: domainForwarding ? `Forward to: ${websiteUrl}` : null
+      }));
+
+      const { data: createdDomains, error: domainError } = await supabase
+        .from('domains')
+        .insert(domainRecords)
+        .select();
+
+      if (domainError) throw domainError;
+
+      // Step 2: Create inboxes for each domain
+      const inboxRecords = [];
+      for (const domain of createdDomains || []) {
+        const domainName = domain.domain_name;
+        
+        // Create 3 inboxes per domain (or based on emailAddresses length)
+        for (let i = 0; i < Math.min(emailAddresses.length, 3); i++) {
+          const emailAddr = emailAddresses[i];
+          const emailAddress = `${emailAddr.prefix}@${domainName}`;
+          
+          inboxRecords.push({
+            email_address: emailAddress,
+            user_id: user.id,
+            domain_id: domain.id,
+            first_name: useUniformNames ? firstName : emailAddr.firstName || firstName,
+            last_name: useUniformNames ? lastName : emailAddr.lastName || lastName,
+            status: 'active',
+            health_score: 0,
+            // Placeholder IMAP/SMTP settings - user will configure these later
+            imap_host: null,
+            imap_port: null,
+            imap_username: null,
+            imap_password: null,
+            smtp_host: null,
+            smtp_port: null,
+            smtp_username: null,
+            smtp_password: null
+          });
+        }
+      }
+
+      const { data: createdInboxes, error: inboxError } = await supabase
+        .from('inboxes')
+        .insert(inboxRecords)
+        .select();
+
+      if (inboxError) throw inboxError;
+
+      // Step 3: Create warmup accounts for each inbox
+      const warmupRecords = (createdInboxes || []).map(inbox => ({
+        inbox_id: inbox.id,
+        user_id: user.id,
+        warmup_status: 'in_progress',
+        daily_limit: 50,
+        warmup_limit: 50,
+        warmup_increment: 5,
+        progress_percentage: 0,
+        current_daily_sent: 0
+      }));
+
+      const { error: warmupError } = await supabase
+        .from('warmup_accounts')
+        .insert(warmupRecords);
+
+      if (warmupError) throw warmupError;
+
+      toast({
+        title: "Success!",
+        description: `Created ${createdDomains?.length} domains, ${createdInboxes?.length} inboxes, and ${warmupRecords.length} warmup accounts`,
+      });
+
+      // Navigate to email warmup page
+      navigate('/dashboard/warmup');
+
+    } catch (error: any) {
+      console.error('Setup error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to complete setup",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -219,9 +392,20 @@ const InboxOrdering = () => {
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <div className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              step === 'payment' ? 'bg-primary text-white' : step === 'inboxes' ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+            }`}>
+              {step === 'inboxes' ? <CheckCircle2 className="h-5 w-5" /> : '2'}
+            </div>
+            <span className={step === 'payment' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+              Payment
+            </span>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
               step === 'inboxes' ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
             }`}>
-              2
+              3
             </div>
             <span className={step === 'inboxes' ? 'text-foreground font-medium' : 'text-muted-foreground'}>
               Set Up Inboxes
@@ -248,11 +432,39 @@ const InboxOrdering = () => {
                     id="inbox-count"
                     type="number"
                     min="1"
+                    max={getRemainingInboxes()}
                     value={inboxCount}
-                    onChange={(e) => setInboxCount(Math.max(1, parseInt(e.target.value) || 1))}
+                    onChange={(e) => {
+                      const count = Math.max(1, parseInt(e.target.value) || 1);
+                      if (!canOrderInboxes(count)) {
+                        toast({
+                          title: "Package Limit Reached",
+                          description: `Your ${userPackage} plan allows ${packageLimits[userPackage as keyof typeof packageLimits]} inboxes. You have ${currentInboxCount} and can order ${getRemainingInboxes()} more. Please upgrade to order more.`,
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      setInboxCount(count);
+                    }}
                     placeholder="Enter number of inboxes"
                   />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Current: {currentInboxCount}/{packageLimits[userPackage as keyof typeof packageLimits] === 999999 ? '∞' : packageLimits[userPackage as keyof typeof packageLimits]}</span>
+                    <span>Available: {getRemainingInboxes() === 999999 ? '∞' : getRemainingInboxes()}</span>
+                  </div>
                 </div>
+
+                {!canOrderInboxes(inboxCount) && (
+                  <div className="flex items-start gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-destructive">Package Limit Exceeded</p>
+                      <p className="text-muted-foreground mt-1">
+                        You can only order {getRemainingInboxes()} more inbox{getRemainingInboxes() === 1 ? '' : 'es'} with your current {userPackage} plan. Please upgrade to order more.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-start gap-2 p-4 bg-primary/10 border border-primary/20 rounded-lg">
                   <Globe className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
@@ -506,10 +718,10 @@ const InboxOrdering = () => {
                     className="w-full"
                     size="lg"
                     disabled={selectedDomains.length !== domainsNeeded}
-                    onClick={() => setStep('inboxes')}
+                    onClick={() => setStep('payment')}
                   >
                     <CreditCard className="h-4 w-4 mr-2" />
-                    Proceed to Payment & Setup
+                    Proceed to Payment
                   </Button>
                 </CardContent>
               </Card>
@@ -517,7 +729,98 @@ const InboxOrdering = () => {
           </div>
         )}
 
-        {/* Step 2: Set Up Inboxes */}
+        {/* Step 2: Payment */}
+        {step === 'payment' && (
+          <div className="space-y-6">
+            {/* Order Summary */}
+            <Card className="border-border">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  <CardTitle>Order Summary</CardTitle>
+                </div>
+                <CardDescription>Review your domain purchases</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {selectedDomains.map((sel, idx) => {
+                    const ext = extensions.find(e => e.name === sel.extension);
+                    const fullName = `${sel.brand}${sel.extension}`;
+                    return (
+                      <div key={idx} className="flex justify-between items-center p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium text-foreground">{fullName}</span>
+                        </div>
+                        <span className="text-muted-foreground">£{ext?.price}/year</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Separator />
+                <div className="flex justify-between text-lg font-semibold">
+                  <span className="text-foreground">Total (1 year)</span>
+                  <span className="text-primary">£{totalPrice}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Payment Method */}
+            <Card className="border-border">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  <CardTitle>Payment Method</CardTitle>
+                </div>
+                <CardDescription>Complete your purchase to continue</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-foreground mb-1">Stripe Integration Required</p>
+                    <p className="text-muted-foreground">
+                      Payment processing will be enabled once the Stripe API key is configured. 
+                      Contact your administrator to complete the payment integration setup.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Placeholder for Stripe payment form */}
+                <div className="p-8 border-2 border-dashed border-border rounded-lg text-center">
+                  <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground mb-1">Stripe Payment Form</p>
+                  <p className="text-sm text-muted-foreground">Will appear here once configured</p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep('domains')}
+                    className="flex-1"
+                  >
+                    Back to Domains
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      toast({
+                        title: "Payment Bypassed",
+                        description: "Test mode: Proceeding without payment",
+                      });
+                      setStep('inboxes');
+                    }}
+                    className="flex-1"
+                  >
+                    Skip Payment (Test Mode)
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Step 3: Set Up Inboxes */}
         {step === 'inboxes' && (
           <div className="space-y-6">
             {/* User Information */}
@@ -821,9 +1124,13 @@ const InboxOrdering = () => {
               <Button variant="outline" onClick={() => setStep('domains')}>
                 Back to Domains
               </Button>
-              <Button className="flex-1">
+              <Button 
+                className="flex-1" 
+                onClick={handleCompleteSetup}
+                disabled={isSubmitting}
+              >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                Complete Setup
+                {isSubmitting ? 'Setting up...' : 'Complete Setup'}
               </Button>
             </div>
           </div>

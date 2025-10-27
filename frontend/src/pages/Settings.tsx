@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,9 +8,73 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CreditCard, User, Lock, Phone, Mail, Bell, Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useSelector } from "react-redux";
+import {useUpdateUserMutation} from "../services/authService";
 
 const Settings = () => {
+  const navigate = useNavigate();
+   const { user, token, isAuthenticated } = useSelector(
+      (state: any) => state.auth
+    );
+  console.log("user", user);
   const [changePlanOpen, setChangePlanOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState({
+    id:user?.id || "",
+    fname: user?.fname || "",
+    lname: user?.lname || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+  });
+
+  console.log("profile", profile);
+
+  // useEffect(() => {
+  //   loadProfile();
+  // }, []);
+
+  // const loadProfile = async () => {
+  //   setLoading(true);
+  //   const { data: { user } } = await supabase.auth.getUser();
+    
+  //   // if (!user) {
+  //   //   navigate("/auth");
+  //   //   return;
+  //   // }
+
+  //   const { data, error } = await supabase
+  //     .from('profiles')
+  //     .select('*')
+  //     .eq('id', user.id)
+  //     .single();
+
+  //   if (error) {
+  //     console.error('Error loading profile:', error);
+  //     toast.error('Failed to load profile');
+  //   } else if (data) {
+  //     setProfile({
+  //       full_name: data.full_name || '',
+  //       email: data.email || '',
+  //       phone: data.phone || '',
+  //     });
+  //   }
+  //   setLoading(false);
+  // };
+
+  const [updateUser] = useUpdateUserMutation();
+
+  const handleSaveProfile = async () => {
+     try {
+          await updateUser(profile).unwrap();
+          toast.success("Profile updated successfully");
+        } catch (err) {
+          toast.error("Failed to create domain");
+          console.error(err);
+        }
+  };
 
   return (
     <DashboardLayout>
@@ -56,25 +121,64 @@ const Settings = () => {
             <CardDescription>Update your personal details</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="fullname">Full Name</Label>
-              <Input id="fullname" placeholder="John Doe" defaultValue="John Doe" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Email Address
-              </Label>
-              <Input id="email" type="email" placeholder="john@example.com" defaultValue="john@example.com" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                Phone Number
-              </Label>
-              <Input id="phone" type="tel" placeholder="+1 (555) 123-4567" defaultValue="+1 (555) 123-4567" />
-            </div>
-            <Button className="w-full">Save Changes</Button>
+            {/* {loading ? (
+              <div className="flex justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) :  */}
+            {(
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="fname">First Name</Label>
+                  <Input 
+                    id="fname" 
+                    placeholder="John Doe" 
+                    value={profile.fname}
+                    onChange={(e) => setProfile({ ...profile, fname: e.target.value })}
+                  />
+                </div>
+                 <div className="space-y-2">
+                  <Label htmlFor="fname">Last Name</Label>
+                  <Input 
+                    id="lname" 
+                    placeholder="John Doe" 
+                    value={profile.lname}
+                    onChange={(e) => setProfile({ ...profile, lname: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Email Address
+                  </Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    value={profile.email}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    Phone Number
+                  </Label>
+                  <Input 
+                    id="phone" 
+                    type="tel" 
+                    placeholder="+1 (555) 123-4567" 
+                    value={profile.phone}
+                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                  />
+                </div>
+                <Button 
+                  className="w-full" 
+                  onClick={handleSaveProfile}
+                  disabled={saving}
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
 
