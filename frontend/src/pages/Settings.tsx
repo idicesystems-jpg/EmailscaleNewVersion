@@ -1,36 +1,64 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { CreditCard, User, Lock, Phone, Mail, Bell, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSelector } from "react-redux";
-import {useUpdateUserMutation} from "../services/authService";
+import {
+  useUpdateUserMutation,
+  useChangePasswordMutation,
+} from "../services/authService";
 
 const Settings = () => {
   const navigate = useNavigate();
-   const { user, token, isAuthenticated } = useSelector(
-      (state: any) => state.auth
-    );
-  console.log("user", user);
+  const { user, token, isAuthenticated } = useSelector(
+    (state: any) => state.auth
+  );
   const [changePlanOpen, setChangePlanOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState({
-    id:user?.id || "",
+    id: user?.id || "",
     fname: user?.fname || "",
     lname: user?.lname || "",
     email: user?.email || "",
     phone: user?.phone || "",
   });
 
-  console.log("profile", profile);
+  const [passwordData, setPasswordData] = useState({
+    id: user?.id || "",
+    current_password: "",
+    new_password: "",
+    new_password_confirmation: "",
+  });
+
+  const handlePasswordChange = (e) => {
+    setPasswordData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  console.log("passwordData", passwordData);
 
   // useEffect(() => {
   //   loadProfile();
@@ -39,7 +67,7 @@ const Settings = () => {
   // const loadProfile = async () => {
   //   setLoading(true);
   //   const { data: { user } } = await supabase.auth.getUser();
-    
+
   //   // if (!user) {
   //   //   navigate("/auth");
   //   //   return;
@@ -67,13 +95,28 @@ const Settings = () => {
   const [updateUser] = useUpdateUserMutation();
 
   const handleSaveProfile = async () => {
-     try {
-          await updateUser(profile).unwrap();
-          toast.success("Profile updated successfully");
-        } catch (err) {
-          toast.error("Failed to create domain");
-          console.error(err);
-        }
+    try {
+      await updateUser({ profile }).unwrap();
+      toast.success("Profile updated successfully");
+    } catch (err) {
+      toast.error("Failed to update profile");
+      console.error(err);
+    }
+  };
+
+  const [changePassword] = useChangePasswordMutation();
+
+  const handlePasswordSubmit = async (e) => {
+    try {
+      const res = await changePassword({ passwordData }).unwrap();
+      console.log("responce", res);
+      if(res.status == true){
+        toast.success("Password changed successfully");
+        
+      }
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to change password");
+    }
   };
 
   return (
@@ -81,7 +124,9 @@ const Settings = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>
-          <p className="text-muted-foreground">Manage your account and preferences</p>
+          <p className="text-muted-foreground">
+            Manage your account and preferences
+          </p>
         </div>
 
         {/* Stripe Subscription Section */}
@@ -91,22 +136,38 @@ const Settings = () => {
               <CreditCard className="h-5 w-5 mr-2 text-primary" />
               Subscription
             </CardTitle>
-            <CardDescription>Manage your subscription and billing</CardDescription>
+            <CardDescription>
+              Manage your subscription and billing
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between p-4 bg-primary/10 rounded-lg">
               <div>
                 <p className="font-medium text-foreground">Professional Plan</p>
-                <p className="text-sm text-muted-foreground">£99/month • 100 inboxes</p>
-                <p className="text-xs text-muted-foreground mt-1">Next billing date: April 15, 2025</p>
+                <p className="text-sm text-muted-foreground">
+                  £99/month • 100 inboxes
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Next billing date: April 15, 2025
+                </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setChangePlanOpen(true)}>Change Plan</Button>
-                <Button variant="destructive" size="sm">Cancel</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setChangePlanOpen(true)}
+                >
+                  Change Plan
+                </Button>
+                <Button variant="destructive" size="sm">
+                  Cancel
+                </Button>
               </div>
             </div>
             <div className="pt-2">
-              <Button variant="outline" className="w-full">Update Payment Method</Button>
+              <Button variant="outline" className="w-full">
+                Update Payment Method
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -126,24 +187,28 @@ const Settings = () => {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) :  */}
-            {(
+            {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="fname">First Name</Label>
-                  <Input 
-                    id="fname" 
-                    placeholder="John Doe" 
+                  <Input
+                    id="fname"
+                    placeholder="John Doe"
                     value={profile.fname}
-                    onChange={(e) => setProfile({ ...profile, fname: e.target.value })}
+                    onChange={(e) =>
+                      setProfile({ ...profile, fname: e.target.value })
+                    }
                   />
                 </div>
-                 <div className="space-y-2">
+                <div className="space-y-2">
                   <Label htmlFor="fname">Last Name</Label>
-                  <Input 
-                    id="lname" 
-                    placeholder="John Doe" 
+                  <Input
+                    id="lname"
+                    placeholder="John Doe"
                     value={profile.lname}
-                    onChange={(e) => setProfile({ ...profile, lname: e.target.value })}
+                    onChange={(e) =>
+                      setProfile({ ...profile, lname: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -151,34 +216,32 @@ const Settings = () => {
                     <Mail className="h-4 w-4" />
                     Email Address
                   </Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    value={profile.email}
-                  />
+                  <Input id="email" type="email" value={profile.email} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone" className="flex items-center gap-2">
                     <Phone className="h-4 w-4" />
                     Phone Number
                   </Label>
-                  <Input 
-                    id="phone" 
-                    type="tel" 
-                    placeholder="+1 (555) 123-4567" 
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
                     value={profile.phone}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    onChange={(e) =>
+                      setProfile({ ...profile, phone: e.target.value })
+                    }
                   />
                 </div>
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   onClick={handleSaveProfile}
                   disabled={saving}
                 >
-                  {saving ? 'Saving...' : 'Save Changes'}
+                  {saving ? "Saving..." : "Save Changes"}
                 </Button>
               </>
-            )}
+            }
           </CardContent>
         </Card>
 
@@ -189,22 +252,54 @@ const Settings = () => {
               <Lock className="h-5 w-5 mr-2 text-primary" />
               Security
             </CardTitle>
-            <CardDescription>Manage your password and security settings</CardDescription>
+            <CardDescription>
+              Manage your password and security settings
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="current-password">Current Password</Label>
-              <Input id="current-password" type="password" placeholder="••••••••" />
+              <Input
+                id="current-password"
+                name="current_password"
+                type="password"
+                value={passwordData.current_password}
+                onChange={handlePasswordChange}
+                required
+                placeholder="••••••••"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
-              <Input id="new-password" type="password" placeholder="••••••••" />
+              <Input
+                id="new-password"
+                type="password"
+                name="new_password"
+                value={passwordData.new_password}
+                onChange={handlePasswordChange}
+                required
+                placeholder="••••••••"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirm New Password</Label>
-              <Input id="confirm-password" type="password" placeholder="••••••••" />
+              <Input
+                id="confirm-password"
+                type="password"
+                name="new_password_confirmation"
+                value={passwordData.new_password_confirmation}
+                onChange={handlePasswordChange}
+                required
+                placeholder="••••••••"
+              />
             </div>
-            <Button className="w-full">Update Password</Button>
+            <Button
+              className="w-full"
+              onClick={handlePasswordSubmit}
+              disabled={saving}
+            >
+              {saving ? "Updating..." : "Update Password"}
+            </Button>
           </CardContent>
         </Card>
 
@@ -215,34 +310,44 @@ const Settings = () => {
               <Bell className="h-5 w-5 mr-2 text-primary" />
               Notifications
             </CardTitle>
-            <CardDescription>Configure your notification preferences</CardDescription>
+            <CardDescription>
+              Configure your notification preferences
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>Email Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive email updates about your account</p>
+                <p className="text-sm text-muted-foreground">
+                  Receive email updates about your account
+                </p>
               </div>
               <Switch defaultChecked />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>Support Ticket Updates</Label>
-                <p className="text-sm text-muted-foreground">Get notified about support ticket responses</p>
+                <p className="text-sm text-muted-foreground">
+                  Get notified about support ticket responses
+                </p>
               </div>
               <Switch defaultChecked />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>Billing Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive billing and payment notifications</p>
+                <p className="text-sm text-muted-foreground">
+                  Receive billing and payment notifications
+                </p>
               </div>
               <Switch defaultChecked />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>Marketing Emails</Label>
-                <p className="text-sm text-muted-foreground">Receive product updates and newsletters</p>
+                <p className="text-sm text-muted-foreground">
+                  Receive product updates and newsletters
+                </p>
               </div>
               <Switch />
             </div>
@@ -276,17 +381,25 @@ const Settings = () => {
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">30 inboxes included</span>
+                  <span className="text-sm text-muted-foreground">
+                    30 inboxes included
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">Email warmup included</span>
+                  <span className="text-sm text-muted-foreground">
+                    Email warmup included
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">Basic support</span>
+                  <span className="text-sm text-muted-foreground">
+                    Basic support
+                  </span>
                 </div>
-                <Button className="w-full mt-4" variant="outline">Downgrade to Starter</Button>
+                <Button className="w-full mt-4" variant="outline">
+                  Downgrade to Starter
+                </Button>
               </CardContent>
             </Card>
 
@@ -306,19 +419,27 @@ const Settings = () => {
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">100 inboxes included</span>
+                  <span className="text-sm text-muted-foreground">
+                    100 inboxes included
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">Advanced email warmup</span>
+                  <span className="text-sm text-muted-foreground">
+                    Advanced email warmup
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">Priority support</span>
+                  <span className="text-sm text-muted-foreground">
+                    Priority support
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">Advanced analytics</span>
+                  <span className="text-sm text-muted-foreground">
+                    Advanced analytics
+                  </span>
                 </div>
                 <Button className="w-full mt-4">Current Plan</Button>
               </CardContent>
@@ -329,7 +450,9 @@ const Settings = () => {
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="text-xl">Unlimited Plan</CardTitle>
-                    <CardDescription>For power users and agencies</CardDescription>
+                    <CardDescription>
+                      For power users and agencies
+                    </CardDescription>
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-bold text-foreground">£299</p>
@@ -340,25 +463,37 @@ const Settings = () => {
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">Unlimited inboxes</span>
+                  <span className="text-sm text-muted-foreground">
+                    Unlimited inboxes
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">Premium email warmup</span>
+                  <span className="text-sm text-muted-foreground">
+                    Premium email warmup
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">24/7 Priority support</span>
+                  <span className="text-sm text-muted-foreground">
+                    24/7 Priority support
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">Dedicated account manager</span>
+                  <span className="text-sm text-muted-foreground">
+                    Dedicated account manager
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">White-label options</span>
+                  <span className="text-sm text-muted-foreground">
+                    White-label options
+                  </span>
                 </div>
-                <Button className="w-full mt-4" variant="outline">Upgrade to Unlimited</Button>
+                <Button className="w-full mt-4" variant="outline">
+                  Upgrade to Unlimited
+                </Button>
               </CardContent>
             </Card>
           </div>
