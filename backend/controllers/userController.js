@@ -544,7 +544,7 @@ const updateUserProfile = async (req, res) => {
         message: 'Validation Error',
         error: errors.array()[0].msg,
       });
-    }
+    }   
 
     const { id, fname, lname, email, phone } = req.body;
 
@@ -636,6 +636,7 @@ const changePassword = async (req, res) => {
   }
 };
 
+
 module.exports = {
   login,
   register,
@@ -647,5 +648,5 @@ module.exports = {
   exportCsv,
   getUsersWithoutPagination,
   updateUserProfile,
-  changePassword
+  changePassword,
 };

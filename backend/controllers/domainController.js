@@ -9,7 +9,8 @@ const dayjs = require("dayjs");
 const fs = require("fs");
 const csv = require("csv-parser");
 const { Parser } = require("json2csv");
-const namecheapService = require("../services/namecheapService");
+const NamecheapService = require("../services/namecheapService");
+const namecheapService = new NamecheapService();
 
 const saveDomainAndUser = async (req, res) => {
   try {
@@ -687,37 +688,63 @@ const checkAlternateDomainAvailability0 = async (req, res) => {
     const { domain_name, count } = req.body;
 
     // Validate input
-    if (!domain_name || typeof domain_name !== 'string') {
-      return res.status(400).json({ error: 'Domain name is required and must be a string' });
+    if (!domain_name || typeof domain_name !== "string") {
+      return res
+        .status(400)
+        .json({ error: "Domain name is required and must be a string" });
     }
 
     const domainCount = count ? parseInt(count) : 1;
     if (domainCount < 1 || domainCount > 50) {
-      return res.status(400).json({ error: 'Count must be between 1 and 50' });
+      return res.status(400).json({ error: "Count must be between 1 and 50" });
     }
 
     // Call Namecheap service
-    const result = await namecheapService.searchAlternateDomains(domain_name, domainCount);
+    const result = await namecheapService.searchAlternateDomains(
+      domain_name,
+      domainCount
+    );
 
     return res.status(200).json(result);
   } catch (error) {
-    console.error('Error checking domain availability:', error);
-    return res.status(500).json({ error: error.message || 'Internal Server Error' });
+    console.error("Error checking domain availability:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Internal Server Error" });
   }
 };
 
 const checkAlternateDomainAvailability = async (req, res) => {
   try {
-    const { domain_name, count = 1 } = req.body;
+    // Validate request fields
+    // const errors = validationResult(req);
+    // if (!errors.isEmpty()) {
+    //   return res.status(422).json({
+    //     status: false,
+    //     message: "Validation Error",
+    //     error: errors.array()[0].msg,
+    //   });
+    // }
+
+    const { domain_name, domain_type, count = 1 } = req.body;
 
     if (!domain_name) {
       return res.status(400).json({ error: 'Domain name is required' });
     }
 
-    const result = await namecheapService.searchAlternateDomains(domain_name, count);
-    return res.json(result);
+    // Construct domain name with type if present
+    let domainName = domain_name;
+    if (domain_type) {
+      domainName += domain_type;
+    }
+
+    // Call Namecheap service
+    const result = await namecheapService.searchAlternateDomains(domainName, count);
+    res.json(result);
+
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('Error in checkAlternateDomainAvailability:', err);
+    res.status(500).json({ error: err.message || 'Something went wrong' });
   }
 };
 const checkDomainAvailability = async (req, res) => {
@@ -726,20 +753,24 @@ const checkDomainAvailability = async (req, res) => {
     const domains = req.body.result;
 
     if (!domains || domains.length === 0) {
-      return res.status(400).json({ status: false, message: 'result field is required' });
+      return res
+        .status(400)
+        .json({ status: false, message: "result field is required" });
     }
 
     // Call the Namecheap service
-    const result = await namecheapService.searchDomains(domains);
-
+    // const result = await namecheapService.searchDomains(domains);
+    const result = await NamecheapService.searchAlternateDomains(
+      domain_name,
+      count
+    );
     // Return the result as JSON
     return res.json(result);
   } catch (error) {
-    console.error('Error checking domain availability:', error);
+    console.error("Error checking domain availability:", error);
     return res.status(500).json({ status: false, message: error.message });
   }
 };
-
 
 module.exports = {
   saveDomainAndUser,
@@ -750,5 +781,5 @@ module.exports = {
   destroyDomain,
   exportDomainsCsv,
   checkAlternateDomainAvailability,
-  checkDomainAvailability
+  checkDomainAvailability,
 };
