@@ -526,6 +526,115 @@ const exportCsv = async (req, res) => {
   }
 };
 
+const updateUserProfile = async (req, res) => {
+  try {
+    await Promise.all([
+      body('id').notEmpty().withMessage('id is required').run(req),
+      body('fname').notEmpty().withMessage('fname is required').isString().run(req),
+      body('lname').notEmpty().withMessage('lname is required').isString().run(req),
+      body('email').isEmail().withMessage('Invalid email').run(req),
+      body('phone').notEmpty().withMessage('phone is required').isString().isLength({ max: 12 }).run(req)
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(422).json({
+        status: false,
+        message: 'Validation Error',
+        error: errors.array()[0].msg,
+      });
+    }
+
+    const { id, fname, lname, email, phone } = req.body;
+
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const existingEmail = await User.findOne({ where: { email } });
+    if (existingEmail && existingEmail.id !== parseInt(id)) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+
+    const updatedData = {
+      fname,
+      lname,
+      name: `${fname} ${lname}`,
+      email,
+      phone,
+    };
+
+    await user.update(updatedData);
+
+    return res.status(200).json({
+      message: 'Profile updated successfully',
+      user,
+    });
+  } catch (error) {
+    console.error('User update failed:', error);
+    return res.status(500).json({
+      message: 'Server error',
+      error: error.message,
+    });
+  }
+};
+
+const changePassword = async (req, res) => {
+  try {
+    const { id, current_password, new_password, new_password_confirmation } = req.body;
+
+    if (!id || !current_password || !new_password || !new_password_confirmation) {
+      return res.status(400).json({
+        status: false,
+        message: "All fields are required (id, current_password, new_password, new_password_confirmation)",
+      });
+    }
+
+    
+    if (new_password !== new_password_confirmation) {
+      return res.status(422).json({
+        status: false,
+        message: "New password confirmation does not match",
+      });
+    }
+
+   
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({
+        status: false,
+        message: "User not found",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(current_password, user.password);
+    if (!isMatch) {
+      return res.status(403).json({
+        status: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    
+    const hashedPassword = await bcrypt.hash(new_password, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    return res.json({
+      status: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating password:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   login,
   register,
@@ -536,4 +645,6 @@ module.exports = {
   deleteUser,
   exportCsv,
   getUsersWithoutPagination,
+  updateUserProfile,
+  changePassword
 };

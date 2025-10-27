@@ -798,4 +798,45 @@ const deleteCampaign = async (req, res) => {
   }
 };
 
-module.exports = { getAllEmailCampaigns, getEmailCampaigns, singleEmailCampaign, emailCampaign, updateCampaignDetails, deleteCampaigns, deleteCampaign};
+const updateLimits = async (req, res) => {
+  try {
+    const { ids, daily_limit, warmup_limit } = req.body;
+
+    // Validate request body
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "'ids' must be a non-empty array" });
+    }
+
+    // Fetch campaigns with given IDs
+    const campaigns = await Campaign.findAll({ where: { id: ids } });
+
+    if (!campaigns.length) {
+      return res.status(404).json({ error: 'No campaigns found for the provided IDs' });
+    }
+
+    // Update each campaign
+    for (const campaign of campaigns) {
+      if (daily_limit !== undefined && daily_limit !== null) {
+        campaign.daily_limit = daily_limit;
+      }
+      if (warmup_limit !== undefined && warmup_limit !== null) {
+        campaign.warmup_limit = warmup_limit;
+      }
+      await campaign.save();
+    }
+
+    return res.status(200).json({
+      message: 'Campaign limits updated successfully',
+      campaigns
+    });
+
+  } catch (error) {
+    console.error('Error updating limits:', error);
+    return res.status(500).json({
+      error: 'Failed to update campaign limits',
+      details: error.message
+    });
+  }
+};
+
+module.exports = { getAllEmailCampaigns, getEmailCampaigns, singleEmailCampaign, emailCampaign, updateCampaignDetails, deleteCampaigns, deleteCampaign, updateLimits };
