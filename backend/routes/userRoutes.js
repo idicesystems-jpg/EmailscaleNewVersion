@@ -14,6 +14,8 @@ const {
   deleteUser,
   exportCsv,
   getUsersWithoutPagination,
+  updateUserProfile,
+  changePassword
 } = require("../controllers/userController");
 const {
   getAllTransactions,
@@ -78,6 +80,7 @@ const {
   updateCampaignDetails,
   deleteCampaigns,
   deleteCampaign,
+  updateLimits
 } = require("../controllers/emailCampaignController");
 
 const {
@@ -99,6 +102,8 @@ router.post("/add-user", addUser);
 router.put("/update-status/:id", updateStatus);
 router.delete("/delete-user/:id", deleteUser);
 router.get("/export-csv", exportCsv);
+router.post('/update-user', updateUserProfile);
+router.post("/change-password", changePassword);
 
 router.get("/transaction", getAllTransactions);
 router.get("/transaction:id", getTransactionById);
@@ -161,6 +166,7 @@ router.post("/email-campaign", upload.single("file"), emailCampaign);
 router.put("/update-campaign", updateCampaignDetails);
 router.post("/delete_campaigns", deleteCampaigns);
 router.post("/delete_campaign", deleteCampaign);
+router.post('/update-limits', updateLimits);
 
 router.get("/smtps", getAllSmtps);
 router.post("/smtps", createSmtp);
