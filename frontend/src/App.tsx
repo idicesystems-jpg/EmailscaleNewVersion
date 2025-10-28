@@ -44,7 +44,7 @@ const App = () => (
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute allowedRoles={[2]}>
+                <ProtectedRoute allowedRoles={[2,1]}>
                   <Dashboard />
                 </ProtectedRoute>
               }
@@ -52,7 +52,7 @@ const App = () => (
             <Route
               path="/dashboard/inbox-ordering"
               element={
-                <ProtectedRoute allowedRoles={[2]}>
+                <ProtectedRoute allowedRoles={[2,1]}>
                   <InboxOrdering />
                 </ProtectedRoute>
               }
@@ -60,7 +60,7 @@ const App = () => (
             <Route
               path="/dashboard/warmup"
               element={
-                <ProtectedRoute allowedRoles={[2]}>
+                <ProtectedRoute allowedRoles={[2,1]}>
                   <EmailWarmup />
                 </ProtectedRoute>
               }
@@ -68,7 +68,7 @@ const App = () => (
             <Route
               path="/dashboard/placement-test"
               element={
-                <ProtectedRoute allowedRoles={[2]}>
+                <ProtectedRoute allowedRoles={[2,1]}>
                   <PlacementTest />
                 </ProtectedRoute>
               }
@@ -76,7 +76,7 @@ const App = () => (
             <Route
               path="/dashboard/verification"
               element={
-                <ProtectedRoute allowedRoles={[2]}>
+                <ProtectedRoute allowedRoles={[2,1]}>
                   <EmailVerification />
                 </ProtectedRoute>
               }
@@ -84,7 +84,7 @@ const App = () => (
             <Route
               path="/dashboard/integrations"
               element={
-                <ProtectedRoute allowedRoles={[2]}>
+                <ProtectedRoute allowedRoles={[2,1]}>
                   <Integrations />
                 </ProtectedRoute>
               }
@@ -92,7 +92,7 @@ const App = () => (
             <Route
               path="/dashboard/support"
               element={
-                <ProtectedRoute allowedRoles={[2]}>
+                <ProtectedRoute allowedRoles={[2,1]}>
                   <Support />
                 </ProtectedRoute>
               }
@@ -100,7 +100,7 @@ const App = () => (
             <Route
               path="/dashboard/settings"
               element={
-                <ProtectedRoute allowedRoles={[2]}>
+                <ProtectedRoute allowedRoles={[2,1]}>
                   <Settings />
                 </ProtectedRoute>
               }

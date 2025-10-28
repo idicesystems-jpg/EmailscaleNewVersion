@@ -39,7 +39,11 @@ const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Inbox Ordering", url: "/dashboard/inbox-ordering", icon: Mail },
   { title: "Email Warmup", url: "/dashboard/warmup", icon: Flame },
-  { title: "Email Verification", url: "/dashboard/verification", icon: CheckCircle },
+  {
+    title: "Email Verification",
+    url: "/dashboard/verification",
+    icon: CheckCircle,
+  },
   { title: "Integrations", url: "/dashboard/integrations", icon: LinkIcon },
   { title: "Support", url: "/dashboard/support", icon: HelpCircle },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
@@ -66,7 +70,10 @@ function AppSidebar() {
       : "hover:bg-muted/50 text-muted-foreground hover:text-foreground";
 
   return (
-    <Sidebar className={state === "collapsed" ? "w-14" : "w-64"} collapsible="icon">
+    <Sidebar
+      className={state === "collapsed" ? "w-14" : "w-64"}
+      collapsible="icon"
+    >
       <SidebarContent>
         <div className="p-3 border-b border-border flex items-center">
           {state !== "collapsed" ? (
@@ -105,7 +112,9 @@ function AppSidebar() {
               }}
             >
               <ArrowLeft className="h-4 w-4" />
-              {state !== "collapsed" && <span className="ml-2">Back to Admin</span>}
+              {state !== "collapsed" && (
+                <span className="ml-2">Back to Admin</span>
+              )}
             </Button>
           )}
           <Button
@@ -131,20 +140,41 @@ function AppSidebar() {
 }
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
-  const { impersonatedUserEmail } = useImpersonation();
+  const { impersonatedUserEmail ,clearImpersonation } = useImpersonation();
+  const navigate = useNavigate();
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <main className="flex-1 overflow-auto">
+          {impersonatedUserEmail && (
+            <div className="bg-orange-500 text-white px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-lg">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="h-5 w-5" />
+                <div>
+                  <p className="font-semibold">Admin View Mode</p>
+                  <p className="text-sm text-orange-100">
+                    Viewing as client: {impersonatedUserEmail}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  clearImpersonation();
+                  navigate("/admin");
+                }}
+                className="bg-white text-orange-500 hover:bg-orange-50"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Return to Admin Dashboard
+              </Button>
+            </div>
+          )}
           <header className="h-14 border-b border-border flex items-center px-4 sticky top-0 bg-background/80 backdrop-blur-sm z-10">
             <SidebarTrigger />
-            {impersonatedUserEmail && (
-              <div className="ml-4 px-3 py-1 bg-primary/20 text-primary rounded-md text-sm font-medium">
-                Viewing as: {impersonatedUserEmail}
-              </div>
-            )}
           </header>
           <div className="p-6">{children}</div>
         </main>
