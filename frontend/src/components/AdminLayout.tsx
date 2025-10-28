@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode,useState,useEffect} from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import emailScaleLogo from "@/assets/emailscale-logo.png";
@@ -11,13 +11,22 @@ import {
   Globe,
   LifeBuoy,
   Server,
-  Settings
+  Settings,
+  UserCog
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+import { useAdminRole } from "@/hooks/useAdminRole";
+import { useImpersonation } from "@/hooks/useImpersonation";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+
 import { useDispatch } from "react-redux";
 import { logout } from "../services/authSlice";
+
+import { useAllUsersQuery } from "../services/adminUserService";
+import { useSelector } from "react-redux";
 
 
 interface AdminLayoutProps {
@@ -25,9 +34,45 @@ interface AdminLayoutProps {
 }
 
 export const AdminLayout = ({ children }: AdminLayoutProps) => {
+   const { user, token, isAuthenticated } = useSelector(
+    (state: any) => state.auth
+  );
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const { adminRole, loading, isAdmin } = useAdminRole();
+
+  const { impersonatedUserId, impersonatedUserEmail, setImpersonation, clearImpersonation } = useImpersonation();
+  console.log("impersonatedUserId",impersonatedUserId);
+
+  const { data , isLoading } = useAllUsersQuery();
+  const allUsers = data?.users || [];
+
+  const currentUserId = user.id || null ;
+
+  useEffect(() => {
+    if (!loading && !isAdmin) {
+      toast.error("Access denied - Admin access required");
+      navigate("/dashboard");
+    }
+  }, [isAdmin, loading, navigate]);
+
+   const handleUserSwitch = async (userId: string) => {
+    const user = allUsers?.find((u) => u.id === userId);
+    if (!user) return;
+    
+      if (userId === currentUserId) {
+        clearImpersonation();
+        toast.success("Viewing as yourself");
+        navigate("/admin");
+      } else {
+        await  setImpersonation(userId, user.email);
+        toast.success(`Now viewing as ${user.fname || user.email}`);
+        navigate("/dashboard");
+      }
+    
+  };
 
   const handleLogout = async () => {
     //await supabase.auth.signOut();
@@ -50,6 +95,16 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
     { path: "/admin/settings", icon: Settings, label: "Settings" },
   ];
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) return null;
+
   return (
     <div className="min-h-screen flex bg-background">
       {/* Sidebar */}
@@ -62,6 +117,43 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
           <h1 className="text-2xl font-bold text-primary">Admin Panel</h1>
           <p className="text-sm text-muted-foreground mt-1">System Management</p>
         </div>
+
+        
+      {/* User Impersonation Selector (Admins Only) */}
+        {isAdmin && allUsers?.length > 0 && (
+          <div className="px-4 pb-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <UserCog className="h-4 w-4" />
+              <span className="font-medium">View as Client</span>
+            </div>
+
+            <Select
+              value={impersonatedUserId || currentUserId}
+              onValueChange={handleUserSwitch}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select client" />
+              </SelectTrigger>
+              <SelectContent>
+                {allUsers?.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.full_name || user.email}
+                    {user.id === currentUserId && " (You)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {impersonatedUserId && (
+              <Badge
+                variant="secondary"
+                className="w-full justify-center text-xs"
+              >
+                Viewing as: {impersonatedUserEmail}
+              </Badge>
+            )}
+          </div>
+        )}
         
         <nav className="px-4 space-y-2 flex-1">
           {navItems.map((item) => (

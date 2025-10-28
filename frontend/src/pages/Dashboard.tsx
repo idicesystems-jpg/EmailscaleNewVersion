@@ -1,24 +1,37 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { OnboardingWalkthrough } from "../components/OnboardingWalkthrough";
 import { useImpersonation } from "@/hooks/useImpersonation";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { 
-  Mail, 
-  Flame, 
-  Globe, 
-  Activity, 
-  Target, 
-  Send, 
-  CheckCircle2, 
-  AlertTriangle, 
+import {
+  Mail,
+  Flame,
+  Globe,
+  Activity,
+  Target,
+  Send,
+  CheckCircle2,
+  AlertTriangle,
   ShieldAlert,
   TrendingUp,
   Package,
   Ticket,
-  Clock
+  Clock,
 } from "lucide-react";
+import { useSelector } from "react-redux";
+import {
+  useNotificationsUnreadCountQuery,
+  useNotificationsByEmailQuery,
+  useMarkNotificationsReadMutation,
+} from "../services/ticketService";
 
 const Dashboard = () => {
   const { impersonatedUserId } = useImpersonation();
@@ -31,15 +44,74 @@ const Dashboard = () => {
   });
   const [profile, setProfile] = useState<any>(null);
 
+  const { user, token, isAuthenticated } = useSelector(
+    (state: any) => state.auth
+  );
+
+  // For getting unread count
+  const { data: unreadCount } = useNotificationsUnreadCountQuery(user.email);
+
+  // For getting all notifications
+  const { data: notifications } = useNotificationsByEmailQuery(user.email);
+
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
   useEffect(() => {
     fetchDashboardData();
+    checkOnboarding();
+    // Set up realtime listeners
+    const actualUser = user;
   }, [impersonatedUserId]);
 
+  const checkOnboarding = async () => {
+    try {
+      if (!user) return;
+
+      // const { data: preferences } = await supabase
+      //   .from('user_preferences')
+      //   .select('onboarding_completed')
+      //   .eq('user_id', user.id)
+      //   .single();
+
+      //if (!preferences) {
+        // First time user - show onboarding
+        setShowOnboarding(true);
+        // Create preferences record
+        // await supabase
+        //   .from('user_preferences')
+        //   .insert({ user_id: user.id, onboarding_completed: false });
+      // } else if (!preferences.onboarding_completed) {
+      //   setShowOnboarding(true);
+      // }
+    } catch (error) {
+      console.error('Error checking onboarding:', error);
+    }
+  };
+
+  const handleOnboardingComplete = async () => {
+    try {
+      //const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // await supabase
+      //   .from('user_preferences')
+      //   .update({ onboarding_completed: true })
+      //   .eq('user_id', user.id);
+
+      setShowOnboarding(false);
+      // toast.success("Welcome aboard!", {
+      //   description: "You're all set. Let's get started!",
+      // });
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+    }
+  };
   const fetchDashboardData = async () => {
     setLoading(true);
     
     // Get the user ID to use (impersonated or actual)
-    const userId = impersonatedUserId || (await supabase.auth.getUser()).data.user?.id;
+    const actualUser = (await supabase.auth.getUser()).data.user;
+    const userId = impersonatedUserId || actualUser?.id;
     
     if (!userId) {
       setLoading(false);
@@ -85,10 +157,16 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout>
+      <OnboardingWalkthrough
+        open={showOnboarding}
+        onComplete={handleOnboardingComplete}
+      />
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome to EmailScale - Manage your email operations</p>
+          <p className="text-muted-foreground">
+            Welcome to EmailScale - Manage your email operations
+          </p>
         </div>
 
         {/* Account & Resources */}
@@ -101,11 +179,22 @@ const Dashboard = () => {
               <Globe className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-foreground">{stats.domains}/100</div>
+              <div className="text-2xl font-bold text-foreground">
+                {stats.domains}/100
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Package: {profile?.subscription_plan || 'starter'} (£{profile?.subscription_plan === 'unlimited' ? '299' : profile?.subscription_plan === 'professional' ? '99' : '69'}/mo)
+                Package: {profile?.subscription_plan || "starter"} (£
+                {profile?.subscription_plan === "unlimited"
+                  ? "299"
+                  : profile?.subscription_plan === "professional"
+                  ? "99"
+                  : "69"}
+                /mo)
               </p>
-              <Progress value={(stats.domains / 100) * 100} className="mt-2 h-1" />
+              <Progress
+                value={(stats.domains / 100) * 100}
+                className="mt-2 h-1"
+              />
             </CardContent>
           </Card>
 
@@ -117,7 +206,9 @@ const Dashboard = () => {
               <Mail className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-foreground">{stats.inboxes}</div>
+              <div className="text-2xl font-bold text-foreground">
+                {stats.inboxes}
+              </div>
               <p className="text-xs text-primary flex items-center mt-1">
                 <TrendingUp className="h-3 w-3 mr-1" />
                 Active mailboxes
@@ -133,8 +224,13 @@ const Dashboard = () => {
               <Flame className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-foreground">{stats.warmupAccounts > 0 ? '87%' : '0%'}</div>
-              <Progress value={stats.warmupAccounts > 0 ? 87 : 0} className="mt-2 h-1" />
+              <div className="text-2xl font-bold text-foreground">
+                {stats.warmupAccounts > 0 ? "87%" : "0%"}
+              </div>
+              <Progress
+                value={stats.warmupAccounts > 0 ? 87 : 0}
+                className="mt-2 h-1"
+              />
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.warmupAccounts} warmup accounts
               </p>
@@ -159,7 +255,9 @@ const Dashboard = () => {
 
         {/* Performance Metrics */}
         <div>
-          <h2 className="text-xl font-semibold text-foreground mb-4">Performance Metrics</h2>
+          <h2 className="text-xl font-semibold text-foreground mb-4">
+            Performance Metrics
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="border-border hover:border-primary/50 transition-colors">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -169,7 +267,9 @@ const Dashboard = () => {
                 <Send className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">{stats.emailsSent}</div>
+                <div className="text-2xl font-bold text-foreground">
+                  {stats.emailsSent}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Last 30 days
                 </p>
@@ -255,21 +355,27 @@ const Dashboard = () => {
               <div className="flex items-start p-3 bg-secondary/50 rounded-lg">
                 <CheckCircle2 className="h-5 w-5 text-primary mr-3 mt-0.5" />
                 <div>
-                  <p className="text-sm text-foreground font-medium">Email verification completed</p>
+                  <p className="text-sm text-foreground font-medium">
+                    Email verification completed
+                  </p>
                   <p className="text-xs text-muted-foreground">2 hours ago</p>
                 </div>
               </div>
               <div className="flex items-start p-3 bg-secondary/50 rounded-lg">
                 <Flame className="h-5 w-5 text-primary mr-3 mt-0.5" />
                 <div>
-                  <p className="text-sm text-foreground font-medium">Warmup campaign updated</p>
+                  <p className="text-sm text-foreground font-medium">
+                    Warmup campaign updated
+                  </p>
                   <p className="text-xs text-muted-foreground">5 hours ago</p>
                 </div>
               </div>
               <div className="flex items-start p-3 bg-secondary/50 rounded-lg">
                 <Globe className="h-5 w-5 text-primary mr-3 mt-0.5" />
                 <div>
-                  <p className="text-sm text-foreground font-medium">New domain added</p>
+                  <p className="text-sm text-foreground font-medium">
+                    New domain added
+                  </p>
                   <p className="text-xs text-muted-foreground">1 day ago</p>
                 </div>
               </div>
@@ -286,34 +392,44 @@ const Dashboard = () => {
                   <Ticket className="h-5 w-5 mr-2 text-primary" />
                   Support Ticket Notifications
                 </CardTitle>
-                <CardDescription>Recent updates on your support tickets</CardDescription>
+                <CardDescription>
+                  Recent updates on your support tickets
+                </CardDescription>
               </div>
               <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full">
-                <span className="text-xs font-medium text-primary">2 Active</span>
+                <span className="text-xs font-medium text-primary">
+                  {unreadCount?.count} Active
+                </span>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-start p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <CheckCircle2 className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-foreground font-medium">Email Warmup Configuration Issue</p>
-                    <p className="text-xs text-muted-foreground mt-1">Ticket #1234 - Resolved</p>
+          <CardContent className="space-y-3 max-h-80 overflow-y-auto">
+            {notifications?.notifications?.map((noty, index) => (
+              <div className="flex items-start p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <CheckCircle2 className="h-5 w-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm text-foreground font-medium">
+                        Email Warmup {noty.type}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Ticket #{noty.id}
+                      </p>
+                    </div>
+                    <div className="flex items-center text-xs text-muted-foreground ml-4">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {new Date(noty.created_at).toLocaleString()}
+                    </div>
                   </div>
-                  <div className="flex items-center text-xs text-muted-foreground ml-4">
-                    <Clock className="h-3 w-3 mr-1" />
-                    2h ago
-                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {noty.message}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Our team has resolved your warmup configuration issue. All settings are now properly configured.
-                </p>
               </div>
-            </div>
+            ))}
 
-            <div className="flex items-start p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            {/* <div className="flex items-start p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
               <Clock className="h-5 w-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <div className="flex items-start justify-between">
@@ -349,7 +465,7 @@ const Dashboard = () => {
                   We need additional information to process your billing inquiry. Please check your email.
                 </p>
               </div>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
       </div>

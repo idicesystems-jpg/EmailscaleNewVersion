@@ -108,6 +108,27 @@ export const ticketService = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Tickets"],
     }),
+
+    notificationsUnreadCount: builder.query({
+      query: (email) => ({
+        url: `notifications/unread-count/${email}`,
+        method: "GET",
+      }),
+    }),
+
+    notificationsByEmail: builder.query({
+      query: (email) => ({
+        url: `notifications/${email}`,
+        method: "GET",
+      }),
+    }),
+
+    markNotificationsRead: builder.mutation({
+      query: (email) => ({
+        url: `notifications/mark-read/${email}`,
+        method: "POST",
+      }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -124,4 +145,7 @@ export const {
   useAddTicketNoteMutation,
   useDeleteNoteMutation,
   useRateTicketMutation,
+  useNotificationsUnreadCountQuery,
+  useNotificationsByEmailQuery,
+  useMarkNotificationsReadMutation,
 } = ticketService;
