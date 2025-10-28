@@ -96,6 +96,11 @@ const {
   completeOnboarding,
 } = require("../controllers/userPreferenceController");
 
+const {
+  startImpersonation,
+  stopImpersonation,
+  getActiveImpersonation,
+} = require("../controllers/impersonationController");
 // Routes
 router.post("/login", login);
 
@@ -184,5 +189,10 @@ router.post("/smtps_bulk_import", createSmtpBulk);
 // User Preference Routes
 router.post("/check-onboarding", checkOnboarding);
 router.post("/complete-onboarding", completeOnboarding);
+
+// Impersonation Routes
+router.post('/impersonate/start',startImpersonation);
+router.post('/impersonate/stop',stopImpersonation);
+router.get('/impersonate/active/:adminId',getActiveImpersonation);
 
 module.exports = router;
