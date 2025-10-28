@@ -24,7 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSelector } from "react-redux";
 import {
-  useUpdateUserMutation,
+  useUpdateUserProfileMutation,
   useChangePasswordMutation,
 } from "../services/authService";
 
@@ -92,11 +92,11 @@ const Settings = () => {
   //   setLoading(false);
   // };
 
-  const [updateUser] = useUpdateUserMutation();
+  const [updateUserProfile] = useUpdateUserProfileMutation();
 
   const handleSaveProfile = async () => {
     try {
-      await updateUser({ profile }).unwrap();
+      await updateUserProfile({ profile }).unwrap();
       toast.success("Profile updated successfully");
     } catch (err) {
       toast.error("Failed to update profile");

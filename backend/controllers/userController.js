@@ -340,6 +340,7 @@ const addUser = async (req, res) => {
 };
 
 const updateUser = async (req, res) => {
+  console.log("this function is calling");
   try {
     const { id } = req.params;
     const {
@@ -528,6 +529,7 @@ const exportCsv = async (req, res) => {
 };
 
 const updateUserProfile = async (req, res) => {
+  console.log("this profile function is calling");
   try {
     await Promise.all([
       body('id').notEmpty().withMessage('id is required').run(req),

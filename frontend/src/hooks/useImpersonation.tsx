@@ -1,4 +1,11 @@
-import { createContext, useContext, useState, ReactNode,useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+} from "react";
+import { useSelector } from "react-redux";
 import axios from "axios";
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -9,20 +16,38 @@ interface ImpersonationContextType {
   clearImpersonation: () => void;
 }
 
-const ImpersonationContext = createContext<ImpersonationContextType | undefined>(undefined);
+const ImpersonationContext = createContext<
+  ImpersonationContextType | undefined
+>(undefined);
 
 export function ImpersonationProvider({ children }: { children: ReactNode }) {
-  const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(null);
-  const [impersonatedUserEmail, setImpersonatedUserEmail] = useState<string | null>(null);
+  const [impersonatedUserId, setImpersonatedUserId] = useState<string | null>(
+    null
+  );
+  const [impersonatedUserEmail, setImpersonatedUserEmail] = useState<
+    string | null
+  >(null);
 
-   // Fetch active impersonation from DB when app loads
+  const { user, token, isAuthenticated } = useSelector(
+    (state: any) => state.auth
+  );
+
+  // Fetch active impersonation from DB when app loads
   useEffect(() => {
-    const adminId = sessionStorage.getItem("adminId"); // or Redux user ID
+    const adminId = user?.id; // or Redux user ID
     if (!adminId) return;
 
     const fetchImpersonation = async () => {
       try {
-        const { data } = await axios.get(`${API_URL}impersonate/active/${adminId}`);
+        // const { data } = await axios.get(`${API_URL}impersonate/active/${adminId}`);
+        const { data } = await axios.get(
+          `${API_URL}impersonate/active/${adminId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
         if (data) {
           setImpersonatedUserId(data.impersonated_user_id);
           setImpersonatedUserEmail(data.impersonated_email);
@@ -47,11 +72,31 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
   //   setImpersonatedUserEmail(null);
   // };
 
-    // Use same names as your current implementation
-  const setImpersonation = async (userId: string | null, email: string | null) => {
+  // Use same names as your current implementation
+  const setImpersonation = async (
+    userId: string | null,
+    email: string | null
+  ) => {
     try {
-      const adminId = sessionStorage.getItem("adminId");
-      await axios.post(`${API_URL}impersonate/start`, { adminId, userId, userEmail: email });
+      const adminId = user.id;
+      // await axios.post(`${API_URL}impersonate/start`, {
+      //   adminId,
+      //   userId,
+      //   userEmail: email,
+      // });
+      await axios.post(
+        `${API_URL}impersonate/start`,
+        {
+          adminId,
+          userId,
+          userEmail: email,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       setImpersonatedUserId(userId);
       setImpersonatedUserEmail(email);
     } catch (err) {
@@ -61,8 +106,17 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
 
   const clearImpersonation = async () => {
     try {
-      const adminId = sessionStorage.getItem("adminId");
-      await axios.post(`${API_URL}impersonate/stop`, { adminId });
+      const adminId = user.id;
+      //await axios.post(`${API_URL}impersonate/stop`, { adminId });
+      await axios.post(
+        `${API_URL}impersonate/stop`,
+        { adminId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       setImpersonatedUserId(null);
       setImpersonatedUserEmail(null);
     } catch (err) {
@@ -87,7 +141,9 @@ export function ImpersonationProvider({ children }: { children: ReactNode }) {
 export function useImpersonation() {
   const context = useContext(ImpersonationContext);
   if (context === undefined) {
-    throw new Error("useImpersonation must be used within an ImpersonationProvider");
+    throw new Error(
+      "useImpersonation must be used within an ImpersonationProvider"
+    );
   }
   return context;
 }

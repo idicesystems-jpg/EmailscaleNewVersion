@@ -110,7 +110,7 @@ router.use(impersonationMiddleware);
 router.post("/register", authenticateToken, register);
 router.get("/users", getUsers);
 router.get("/all-users", getUsersWithoutPagination);
-router.put("/update-user/:id", updateUser);
+router.put("/updateUserFormData/:id/update", updateUser);
 router.post("/add-user", addUser);
 router.put("/update-status/:id", updateStatus);
 router.delete("/delete-user/:id", deleteUser);

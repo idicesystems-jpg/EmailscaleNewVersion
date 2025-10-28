@@ -63,8 +63,8 @@ export const adminUserService = apiSlice.injectEndpoints({
 
     updateUser: builder.mutation({
       query: ({ userId, ...userData }) => ({
-        url: `update-user/${userId}`,
-        method: "PUT", // or PUT if your backend expects that
+        url: `updateUserFormData/${userId}/update`,
+        method: "PUT", 
         body: userData,
       }),
       invalidatesTags: ["Users"],

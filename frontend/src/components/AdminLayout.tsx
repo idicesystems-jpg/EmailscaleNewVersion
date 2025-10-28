@@ -44,7 +44,6 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
   const { adminRole, loading, isAdmin } = useAdminRole();
 
   const { impersonatedUserId, impersonatedUserEmail, setImpersonation, clearImpersonation } = useImpersonation();
-  console.log("impersonatedUserId",impersonatedUserId);
 
   const { data , isLoading } = useAllUsersQuery();
   const allUsers = data?.users || [];
@@ -67,6 +66,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
         toast.success("Viewing as yourself");
         navigate("/admin");
       } else {
+        //clearImpersonation();
         await  setImpersonation(userId, user.email);
         toast.success(`Now viewing as ${user.fname || user.email}`);
         navigate("/dashboard");

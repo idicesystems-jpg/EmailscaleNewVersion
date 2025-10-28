@@ -34,6 +34,13 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 import { toast } from "sonner";
 import {
   Trash2,
@@ -46,7 +53,10 @@ import {
   CreditCard,
   Eye,
   Search,
+  Edit,
+  Shield,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useImpersonation } from "@/hooks/useImpersonation";
 import { useNavigate } from "react-router-dom";
 
@@ -70,10 +80,33 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [userRoles, setUserRoles] = useState<Record<string, string[]>>({});
   const [newPassword, setNewPassword] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+
+
+  const fetchUserRoles = async () => {
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("user_id, role");
+
+    if (!error && data) {
+      const rolesMap: Record<string, string[]> = {};
+      data.forEach((item) => {
+        if (!rolesMap[item.user_id]) {
+          rolesMap[item.user_id] = [];
+        }
+        rolesMap[item.user_id].push(item.role);
+      });
+      setUserRoles(rolesMap);
+    }
+  };
 
   const [editForm, setEditForm] = useState(false);
 
@@ -125,8 +158,6 @@ const AdminUsers = () => {
     amount: 0,
     status: "",
   });
-
-  console.log("Form Data:", formData);
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [createUser, { isLoading: creating }] = useCreateUserMutation();
@@ -383,6 +414,148 @@ const AdminUsers = () => {
     );
   });
 
+  const handleAssignRole = async (role: "super_admin" | "admin" | "user") => {
+    if (!selectedUser) return;
+
+    console.log("Assigning role:", role, "to user:", selectedUser.id);
+
+    const { data, error } = await supabase
+      .from("user_roles")
+      .insert({
+        user_id: selectedUser.id,
+        role: role,
+      })
+      .select();
+
+    console.log("Insert result:", { data, error });
+
+    if (error) {
+      if (error.code === "23505") {
+        toast.error("User already has this role");
+      } else {
+        toast.error(`Error assigning role: ${error.message}`);
+        console.error("Full error:", error);
+      }
+    } else {
+      toast.success(`Role ${role} assigned successfully`);
+      setRoleDialogOpen(false);
+      setSelectedUser(null);
+      fetchUserRoles();
+    }
+  };
+
+  const handleRemoveRole = async (userId: string, role: string) => {
+    const { error } = await supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+      .eq("role", role as any);
+
+    if (error) {
+      toast.error("Error removing role");
+      console.error(error);
+    } else {
+      toast.success(`Role ${role} removed successfully`);
+      fetchUserRoles();
+    }
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedUserIds.size === filteredUsers.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(filteredUsers.map((u) => u.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedUserIds.size === 0) return;
+
+    const confirmation = prompt(
+      `⚠️ WARNING: This will permanently delete ${selectedUserIds.size} selected user(s) and their associated data.\n\nType "DELETE SELECTED" to confirm:`
+    );
+
+    if (confirmation !== "DELETE SELECTED") {
+      if (confirmation !== null) {
+        toast.error("Deletion cancelled - confirmation text did not match");
+      }
+      return;
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const userId of Array.from(selectedUserIds)) {
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+      if (error) {
+        errorCount++;
+        console.error(`Failed to delete user ${userId}:`, error);
+      } else {
+        successCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`${successCount} user(s) deleted successfully`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} user(s) failed to delete`);
+    }
+
+    setSelectedUserIds(new Set());
+    fetchUsers();
+  };
+
+  const handleDeleteAllUsers = async () => {
+    const confirmation = prompt(
+      `⚠️ DANGER: This will permanently delete ALL ${users.length} users and their associated data (domains, inboxes, warmups).\n\nType "DELETE ALL USERS" to confirm:`
+    );
+
+    if (confirmation !== "DELETE ALL USERS") {
+      if (confirmation !== null) {
+        toast.error("Deletion cancelled - confirmation text did not match");
+      }
+      return;
+    }
+
+    const userIds = users.map((u) => u.id);
+
+    // Delete all users using auth admin
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const userId of userIds) {
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+      if (error) {
+        errorCount++;
+        console.error(`Failed to delete user ${userId}:`, error);
+      } else {
+        successCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`${successCount} users deleted successfully`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} users failed to delete`);
+    }
+
+    fetchUsers();
+  };
+
+ 
+
+  const handleToggleSelectUser = (userId: string) => {
+    const newSelected = new Set(selectedUserIds);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedUserIds(newSelected);
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -393,182 +566,47 @@ const AdminUsers = () => {
             </h1>
             <p className="text-muted-foreground">Manage all system users</p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add User
+          <div className="flex gap-2">
+            {selectedUserIds?.size > 0 && (
+              <Button variant="destructive" onClick={handleBulkDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected ({selectedUserIds?.size})
               </Button>
-            </DialogTrigger>
-
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New User</DialogTitle>
-                <DialogDescription>
-                  Add a new user to the system
-                </DialogDescription>
-              </DialogHeader>
-              {/* Inputs without <form> */}
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                <div className="space-y-2">
-                  <Label htmlFor="fname">First Name</Label>
-                  <Input
-                    id="fname"
-                    name="fname"
-                    value={formData.fname}
-                    onChange={handleInputChange}
-                  />
-                  {errors.fname && (
-                    <p className="text-red-500 text-sm">{errors.fname}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="lname">Last Name</Label>
-                  <Input
-                    id="lname"
-                    name="lname"
-                    value={formData.lname}
-                    onChange={handleInputChange}
-                  />
-                  {errors.lname && (
-                    <p className="text-red-500 text-sm">{errors.lname}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                  />
-                  {errors.email && (
-                    <p className="text-red-500 text-sm">{errors.email}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                  />
-                  {errors.phone && (
-                    <p className="text-red-500 text-sm">{errors.phone}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="company_name">Company Name</Label>
-                  <Input
-                    id="company_name"
-                    name="company_name"
-                    value={formData.company_name}
-                    onChange={handleInputChange}
-                  />
-                  {errors.company_name && (
-                    <p className="text-red-500 text-sm">
-                      {errors.company_name}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                  />
-                  {errors.password && (
-                    <p className="text-red-500 text-sm">{errors.password}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password_confirmation">
-                    Confirm Password
-                  </Label>
-                  <Input
-                    id="password_confirmation"
-                    name="password_confirmation"
-                    type="password"
-                    value={formData.password_confirmation}
-                    onChange={handleInputChange}
-                  />
-                  {errors.password_confirmation && (
-                    <p className="text-red-500 text-sm">
-                      {errors.password_confirmation}
-                    </p>
-                  )}
-                </div>
-
-                {/* Checkbox Access */}
-                <div className="space-y-2">
-                  <Label>Access Tools</Label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        name="email_tool"
-                        checked={formData.email_tool}
-                        onChange={handleInputChange}
-                      />{" "}
-                      Email Tool
-                    </label>
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        name="domains_tool"
-                        checked={formData.domains_tool}
-                        onChange={handleInputChange}
-                      />{" "}
-                      Domains Tool
-                    </label>
-                    <label className="flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        name="warm_up_tool"
-                        checked={formData.warm_up_tool}
-                        onChange={handleInputChange}
-                      />{" "}
-                      WarmUp Tool
-                    </label>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleCreateUser}
-                  className="w-full"
-                  disabled={creating}
-                >
-                  {creating ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
-                      Creating...
-                    </span>
-                  ) : (
-                    "Create User"
-                  )}
+            )}
+            {users.length > 0 && (
+              <Button variant="destructive" onClick={handleDeleteAllUsers}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete All Users
+              </Button>
+            )}
+            <Dialog
+              open={dialogOpen}
+              onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (open) {
+                  // Clear form and selected user when opening dialog
+                  setFormData({
+                    email: "",
+                    password: "",
+                    full_name: "",
+                    phone: "",
+                  });
+                  setSelectedUser(null);
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add User
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
 
-          {editForm && (
-            <Dialog open={editForm} onOpenChange={setEditForm}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Update New User</DialogTitle>
+                  <DialogTitle>Create New User</DialogTitle>
                   <DialogDescription>
-                    Update user to the system
+                    Add a new user to the system
                   </DialogDescription>
                 </DialogHeader>
                 {/* Inputs without <form> */}
@@ -614,30 +652,31 @@ const AdminUsers = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="amount">Amount</Label>
+                    <Label htmlFor="phone">Phone</Label>
                     <Input
-                      id="amount"
-                      name="amount"
-                      type="number"
-                      value={formData.amount}
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      value={formData.phone}
                       onChange={handleInputChange}
                     />
+                    {errors.phone && (
+                      <p className="text-red-500 text-sm">{errors.phone}</p>
+                    )}
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <select
-                      id="status"
-                      name="status"
-                      value={formData.status}
-                      onChange={handleSelectChange}
-                      className="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      <option value="">Select Status</option>
-                      <option value="1">Active</option>
-                      <option value="0">Inactive</option>
-                    </select>
-                    {errors.status && (
-                      <p className="text-red-500 text-sm">{errors.status}</p>
+                    <Label htmlFor="company_name">Company Name</Label>
+                    <Input
+                      id="company_name"
+                      name="company_name"
+                      value={formData.company_name}
+                      onChange={handleInputChange}
+                    />
+                    {errors.company_name && (
+                      <p className="text-red-500 text-sm">
+                        {errors.company_name}
+                      </p>
                     )}
                   </div>
 
@@ -654,6 +693,25 @@ const AdminUsers = () => {
                       <p className="text-red-500 text-sm">{errors.password}</p>
                     )}
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password_confirmation">
+                      Confirm Password
+                    </Label>
+                    <Input
+                      id="password_confirmation"
+                      name="password_confirmation"
+                      type="password"
+                      value={formData.password_confirmation}
+                      onChange={handleInputChange}
+                    />
+                    {errors.password_confirmation && (
+                      <p className="text-red-500 text-sm">
+                        {errors.password_confirmation}
+                      </p>
+                    )}
+                  </div>
+
                   {/* Checkbox Access */}
                   <div className="space-y-2">
                     <Label>Access Tools</Label>
@@ -685,35 +743,181 @@ const AdminUsers = () => {
                         />{" "}
                         WarmUp Tool
                       </label>
-                      <label className="flex items-center gap-1">
-                        <input
-                          type="checkbox"
-                          name="ghl_tool"
-                          checked={formData.ghl_tool}
-                          onChange={handleInputChange}
-                        />{" "}
-                        GHL Tool
-                      </label>
                     </div>
                   </div>
                   <Button
-                    onClick={handleUpdateUser}
+                    onClick={handleCreateUser}
                     className="w-full"
-                    disabled={updating}
+                    disabled={creating}
                   >
-                    {updating ? (
+                    {creating ? (
                       <span className="flex items-center justify-center gap-2">
                         <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
-                        Updating...
+                        Creating...
                       </span>
                     ) : (
-                      "Update User"
+                      "Create User"
                     )}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
-          )}
+
+            {editForm && (
+              <Dialog open={editForm} onOpenChange={setEditForm}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Update New User</DialogTitle>
+                    <DialogDescription>
+                      Update user to the system
+                    </DialogDescription>
+                  </DialogHeader>
+                  {/* Inputs without <form> */}
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="fname">First Name</Label>
+                      <Input
+                        id="fname"
+                        name="fname"
+                        value={formData.fname}
+                        onChange={handleInputChange}
+                      />
+                      {errors.fname && (
+                        <p className="text-red-500 text-sm">{errors.fname}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="lname">Last Name</Label>
+                      <Input
+                        id="lname"
+                        name="lname"
+                        value={formData.lname}
+                        onChange={handleInputChange}
+                      />
+                      {errors.lname && (
+                        <p className="text-red-500 text-sm">{errors.lname}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                      />
+                      {errors.email && (
+                        <p className="text-red-500 text-sm">{errors.email}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="amount">Amount</Label>
+                      <Input
+                        id="amount"
+                        name="amount"
+                        type="number"
+                        value={formData.amount}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <select
+                        id="status"
+                        name="status"
+                        value={formData.status}
+                        onChange={handleSelectChange}
+                        className="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="">Select Status</option>
+                        <option value="1">Active</option>
+                        <option value="0">Inactive</option>
+                      </select>
+                      {errors.status && (
+                        <p className="text-red-500 text-sm">{errors.status}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                      />
+                      {errors.password && (
+                        <p className="text-red-500 text-sm">
+                          {errors.password}
+                        </p>
+                      )}
+                    </div>
+                    {/* Checkbox Access */}
+                    <div className="space-y-2">
+                      <Label>Access Tools</Label>
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            name="email_tool"
+                            checked={formData.email_tool}
+                            onChange={handleInputChange}
+                          />{" "}
+                          Email Tool
+                        </label>
+                        <label className="flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            name="domains_tool"
+                            checked={formData.domains_tool}
+                            onChange={handleInputChange}
+                          />{" "}
+                          Domains Tool
+                        </label>
+                        <label className="flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            name="warm_up_tool"
+                            checked={formData.warm_up_tool}
+                            onChange={handleInputChange}
+                          />{" "}
+                          WarmUp Tool
+                        </label>
+                        <label className="flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            name="ghl_tool"
+                            checked={formData.ghl_tool}
+                            onChange={handleInputChange}
+                          />{" "}
+                          GHL Tool
+                        </label>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleUpdateUser}
+                      className="w-full"
+                      disabled={updating}
+                    >
+                      {updating ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
+                          Updating...
+                        </span>
+                      ) : (
+                        "Update User"
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -811,14 +1015,21 @@ const AdminUsers = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedUserIds.size === filteredUsers.length && filteredUsers.length > 0}
+                        onCheckedChange={handleToggleSelectAll}
+                      />
+                    </TableHead>
                       <TableHead>Full Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Subscription</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Stripe</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Roles</TableHead>
+                    <TableHead>Subscription</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Stripe</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -829,31 +1040,79 @@ const AdminUsers = () => {
                           user.account_locked ? "bg-destructive/5" : ""
                         }
                       >
+                         <TableCell className="w-12">
+                        <Checkbox
+                          checked={selectedUserIds.has(user.id)}
+                          onCheckedChange={() => handleToggleSelectUser(user.id)}
+                        />
+                      </TableCell>
                         <TableCell className="font-medium">
                           {user.name || "—"}
                         </TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>{user.phone || "—"}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
+                         <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {userRoles[user.id]?.map((role) => (
                             <span
-                              className={`px-2 py-1 rounded text-xs ${
-                                user.subscription_plan === "unlimited"
-                                  ? "bg-purple-500/20 text-purple-500"
-                                  : user.subscription_plan === "professional"
-                                  ? "bg-blue-500/20 text-blue-500"
-                                  : "bg-green-500/20 text-green-500"
-                              }`}
+                              key={role}
+                              className="px-2 py-1 rounded text-xs bg-purple-500/20 text-purple-500 flex items-center gap-1 cursor-pointer hover:bg-purple-500/30"
+                              onClick={() => {
+                                if (confirm(`Remove ${role} role from this user?`)) {
+                                  handleRemoveRole(user.id, role);
+                                }
+                              }}
+                              title="Click to remove this role"
                             >
-                              {user.subscription_plan || "starter"}
+                              <Shield className="h-3 w-3" />
+                              {role}
                             </span>
-                            {user.account_paused && (
-                              <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-500">
-                                Paused
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
+                          )) || "—"}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setRoleDialogOpen(true);
+                                }}
+                                className="h-6 px-2"
+                              >
+                                <Shield className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Assign Admin Role</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TableCell>
+                       <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setSubscriptionDialogOpen(true);
+                          }}
+                          className="gap-2"
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            user.subscription_plan === 'unlimited' ? 'bg-purple-500/20 text-purple-500' :
+                            user.subscription_plan === 'professional' ? 'bg-blue-500/20 text-blue-500' :
+                            'bg-green-500/20 text-green-500'
+                          }`}>
+                            {user.subscription_plan === 'unlimited' ? 'Unlimited (£299)' :
+                             user.subscription_plan === 'professional' ? 'Professional (£99)' :
+                             'Starter (£69)'}
+                          </span>
+                        </Button>
+                        {user.account_paused && (
+                          <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-500 ml-2">
+                            Paused
+                          </span>
+                        )}
+                      </TableCell>
                         <TableCell>
                           <span
                             className={`px-2 py-1 rounded text-xs ${
@@ -896,84 +1155,119 @@ const AdminUsers = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditClick(user)}
-                              title="View as User"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleToggleLock(user.id, user.account_locked)
-                              }
-                              title={
-                                user.account_locked
-                                  ? "Unlock account"
-                                  : "Lock account"
-                              }
-                            >
-                              {user.account_locked ? (
-                                <Unlock className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <Lock className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                handleToggleUserStatusPause(
-                                  user.id,
-                                  user.status
-                                )
-                              }
-                              title={
+                             <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewAsUser(user.id, user.email)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>View as User</TooltipContent>
+                            </Tooltip>
+                              <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    handleEditClick(user);
+                                    setEditDialogOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit User</TooltipContent>
+                            </Tooltip>
+                             <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleLock(user.id, user.account_locked)}
+                                >
+                                  {user.account_locked ? (
+                                    <Unlock className="h-4 w-4 text-green-500" />
+                                  ) : (
+                                    <Lock className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {user.account_locked ? "Unlock Account" : "Lock Account"}
+                              </TooltipContent>
+                            </Tooltip>
+                             <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleTogglePause(user.id, user.account_paused)}
+                                   title={
                                 user.status == "1"
                                   ? "Pause account"
                                   : "Resume account"
                               }
-                            >
-                              {user.status == "1" ? (
+                             >
+                                 
+
+                                   {user.status == "1" ? (
                                 <Pause className="h-4 w-4 text-red-500" />
                               ) : (
                                 <Play className="h-4 w-4 text-green-500" />
                               )}
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setPasswordDialogOpen(true);
-                              }}
-                              title="Change password"
-                            >
-                              <Key className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setSubscriptionDialogOpen(true);
-                              }}
-                              title="Manage subscription"
-                            >
-                              <CreditCard className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteUser(user.id)}
-                              title="Delete user"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {user.account_paused ? "Resume Account" : "Pause Account"}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setPasswordDialogOpen(true);
+                                  }}
+                                >
+                                  <Key className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Change Password</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setSubscriptionDialogOpen(true);
+                                  }}
+                                >
+                                  <CreditCard className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Manage Subscription</TooltipContent>
+                            </Tooltip>
+                             <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteUser(user.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete User</TooltipContent>
+                            </Tooltip>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -981,20 +1275,24 @@ const AdminUsers = () => {
                   </TableBody>
                 </Table>
                 {/* Pagination Controls */}
-                <Pagination page={page} setPage={setPage} limit={limit} total={data?.total} />
+                <Pagination
+                  page={page}
+                  setPage={setPage}
+                  limit={limit}
+                  total={data?.total}
+                />
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* Change Password Dialog */}
+         {/* Change Password Dialog */}
         <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Change User Password</DialogTitle>
               <DialogDescription>
-                Set a new password for{" "}
-                {selectedUser?.full_name || selectedUser?.email}
+                Set a new password for {selectedUser?.full_name || selectedUser?.email}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -1015,69 +1313,97 @@ const AdminUsers = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Subscription Management Dialog */}
-        <Dialog
-          open={subscriptionDialogOpen}
-          onOpenChange={setSubscriptionDialogOpen}
-        >
+         {/* Subscription Management Dialog */}
+        <Dialog open={subscriptionDialogOpen} onOpenChange={setSubscriptionDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Manage Subscription</DialogTitle>
               <DialogDescription>
-                Change subscription plan for{" "}
-                {selectedUser?.full_name || selectedUser?.email}
+                Change subscription plan for {selectedUser?.full_name || selectedUser?.email}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>
-                  Current Plan:{" "}
-                  <span className="font-semibold">
-                    {selectedUser?.subscription_plan || "starter"}
-                  </span>
-                </Label>
+                <Label>Current Plan: <span className="font-semibold">{selectedUser?.subscription_plan || 'starter'}</span></Label>
               </div>
               <div className="grid gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => handleUpdateSubscription("starter")}
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleUpdateSubscription('starter')}
                   className="justify-start h-auto py-4"
                 >
                   <div className="text-left">
                     <div className="font-semibold">Starter Plan - £69/mo</div>
-                    <div className="text-sm text-muted-foreground">
-                      30 inboxes
-                    </div>
+                    <div className="text-sm text-muted-foreground">30 inboxes</div>
                   </div>
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleUpdateSubscription("professional")}
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleUpdateSubscription('professional')}
                   className="justify-start h-auto py-4"
                 >
                   <div className="text-left">
-                    <div className="font-semibold">
-                      Professional Plan - £99/mo
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      100 inboxes
-                    </div>
+                    <div className="font-semibold">Professional Plan - £99/mo</div>
+                    <div className="text-sm text-muted-foreground">100 inboxes</div>
                   </div>
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleUpdateSubscription("unlimited")}
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleUpdateSubscription('unlimited')}
                   className="justify-start h-auto py-4"
                 >
                   <div className="text-left">
-                    <div className="font-semibold">
-                      Unlimited Plan - £299/mo
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Unlimited inboxes
-                    </div>
+                    <div className="font-semibold">Unlimited Plan - £299/mo</div>
+                    <div className="text-sm text-muted-foreground">Unlimited inboxes</div>
                   </div>
                 </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Role Assignment Dialog */}
+        <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assign Admin Role</DialogTitle>
+              <DialogDescription>
+                Assign an admin role to {selectedUser?.email}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  onClick={() => handleAssignRole('super_admin')}
+                  variant="outline"
+                  className="flex flex-col h-auto p-4"
+                >
+                  <Shield className="h-6 w-6 mb-2 text-purple-500" />
+                  <span className="font-semibold">Super Admin</span>
+                  <span className="text-xs text-muted-foreground">Full access</span>
+                </Button>
+                <Button
+                  onClick={() => handleAssignRole('admin')}
+                  variant="outline"
+                  className="flex flex-col h-auto p-4"
+                >
+                  <Shield className="h-6 w-6 mb-2 text-blue-500" />
+                  <span className="font-semibold">Admin</span>
+                  <span className="text-xs text-muted-foreground">Full access</span>
+                </Button>
+                <Button
+                  onClick={() => handleAssignRole('user')}
+                  variant="outline"
+                  className="flex flex-col h-auto p-4"
+                >
+                  <Shield className="h-6 w-6 mb-2 text-gray-500" />
+                  <span className="font-semibold">User</span>
+                  <span className="text-xs text-muted-foreground">Regular user</span>
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p><strong>Current roles:</strong> {userRoles[selectedUser?.id]?.join(', ') || 'None'}</p>
+                <p className="text-xs">Click on a role badge in the table to remove it.</p>
               </div>
             </div>
           </DialogContent>

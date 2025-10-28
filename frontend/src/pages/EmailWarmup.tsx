@@ -72,7 +72,7 @@ const EmailWarmup = () => {
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState("");
 
-  const { data, isLoading } = useListEmailCampaignsQuery({
+  const { data, isLoading , refetch } = useListEmailCampaignsQuery({
     page,
     limit,
     user_id: user.id,
@@ -80,6 +80,10 @@ const EmailWarmup = () => {
     sortKey: sortConfig.key,
     sortDirection: sortConfig.direction,
   });
+
+  useEffect(() => {
+  refetch();
+}, []);
 
   const campaigns = data || [];
 
