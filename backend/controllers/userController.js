@@ -636,6 +636,45 @@ const changePassword = async (req, res) => {
   }
 };
 
+const updateUserRole = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { role_id } = req.body;
+
+    if (!role_id) {
+      return res.status(400).json({
+        success: false,
+        message: "role_id is required",
+      });
+    }
+
+
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    user.role_id = role_id;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "User role updated successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Error updating user role:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
 
 module.exports = {
   login,
@@ -649,4 +688,5 @@ module.exports = {
   getUsersWithoutPagination,
   updateUserProfile,
   changePassword,
+  updateUserRole
 };

@@ -15,7 +15,8 @@ const {
   exportCsv,
   getUsersWithoutPagination,
   updateUserProfile,
-  changePassword
+  changePassword,
+  updateUserRole,
 } = require("../controllers/userController");
 const {
   getAllTransactions,
@@ -80,7 +81,7 @@ const {
   updateCampaignDetails,
   deleteCampaigns,
   deleteCampaign,
-  updateLimits
+  updateLimits,
 } = require("../controllers/emailCampaignController");
 
 const {
@@ -88,6 +89,11 @@ const {
   createSmtp,
   createSmtpBulk,
 } = require("../controllers/smtpAccountsController");
+
+const {
+  checkOnboarding,
+  completeOnboarding,
+} = require("../controllers/userPreferenceController");
 
 // Routes
 router.post("/login", login);
@@ -102,8 +108,9 @@ router.post("/add-user", addUser);
 router.put("/update-status/:id", updateStatus);
 router.delete("/delete-user/:id", deleteUser);
 router.get("/export-csv", exportCsv);
-router.post('/update-user', updateUserProfile);
+router.post("/update-user", updateUserProfile);
 router.post("/change-password", changePassword);
+router.put("/users/:id/role", updateUserRole);
 
 router.get("/transaction", getAllTransactions);
 router.get("/transaction:id", getTransactionById);
@@ -166,10 +173,14 @@ router.post("/email-campaign", upload.single("file"), emailCampaign);
 router.put("/update-campaign", updateCampaignDetails);
 router.post("/delete_campaigns", deleteCampaigns);
 router.post("/delete_campaign", deleteCampaign);
-router.post('/update-limits', updateLimits);
+router.post("/update-limits", updateLimits);
 
 router.get("/smtps", getAllSmtps);
 router.post("/smtps", createSmtp);
 router.post("/smtps_bulk_import", createSmtpBulk);
+
+// User Preference Routes
+router.post("/check-onboarding", checkOnboarding);
+router.post("/complete-onboarding", completeOnboarding);
 
 module.exports = router;
