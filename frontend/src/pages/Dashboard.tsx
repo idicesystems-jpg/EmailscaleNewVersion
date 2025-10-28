@@ -33,6 +33,8 @@ import {
   useMarkNotificationsReadMutation,
 } from "../services/ticketService";
 
+import { useCheckOnboardingMutation, useCompleteOnboardingMutation } from "@/services/authService";
+
 const Dashboard = () => {
   const { impersonatedUserId } = useImpersonation();
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,8 @@ const Dashboard = () => {
   const { user, token, isAuthenticated } = useSelector(
     (state: any) => state.auth
   );
+
+
 
   // For getting unread count
   const { data: unreadCount } = useNotificationsUnreadCountQuery(user.email);
@@ -63,9 +67,20 @@ const Dashboard = () => {
     const actualUser = user;
   }, [impersonatedUserId]);
 
+
+  const [checkOnboardingApi] = useCheckOnboardingMutation();
+  const [completeOnboardingApi] = useCompleteOnboardingMutation();
   const checkOnboarding = async () => {
     try {
       if (!user) return;
+
+      const userId = user.id;
+
+      const res = await checkOnboardingApi({user_id: userId}).unwrap();
+
+      if (res?.showOnboarding) {
+      setShowOnboarding(true);
+    }
 
       // const { data: preferences } = await supabase
       //   .from('user_preferences')
@@ -75,7 +90,7 @@ const Dashboard = () => {
 
       //if (!preferences) {
         // First time user - show onboarding
-        setShowOnboarding(true);
+       // setShowOnboarding(true);
         // Create preferences record
         // await supabase
         //   .from('user_preferences')
@@ -92,12 +107,13 @@ const Dashboard = () => {
     try {
       //const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+       const userId = user.id;
 
       // await supabase
       //   .from('user_preferences')
       //   .update({ onboarding_completed: true })
       //   .eq('user_id', user.id);
-
+      await completeOnboardingApi({user_id: userId}).unwrap();
       setShowOnboarding(false);
       // toast.success("Welcome aboard!", {
       //   description: "You're all set. Let's get started!",

@@ -43,6 +43,22 @@ export const authService = apiSlice.injectEndpoints({
         body: passwordData,
       }),
     }),
+
+    checkOnboarding: builder.mutation({
+      query: (body) => ({
+        url: "check-onboarding",
+        method: "POST",
+        body,
+      }),
+    }),
+
+    completeOnboarding: builder.mutation({
+      query: (body) => ({
+        url: "complete-onboarding",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 
   overrideExisting: false,
@@ -54,4 +70,6 @@ export const {
   useGetUserProfileQuery,
   useUpdateUserMutation,
   useChangePasswordMutation,
+  useCheckOnboardingMutation,
+  useCompleteOnboardingMutation,
 } = authService;

@@ -4,6 +4,7 @@ const path = require("path");
 const upload = multer({ dest: "uploads/" });
 const router = express.Router();
 const authenticateToken = require("../middlewares/authMiddleware");
+const impersonationMiddleware  = require("../middlewares/impersonationMiddleware");
 const {
   login,
   register,
@@ -99,6 +100,7 @@ const {
 router.post("/login", login);
 
 router.use(authenticateToken);
+router.use(impersonationMiddleware);
 
 router.post("/register", authenticateToken, register);
 router.get("/users", getUsers);
