@@ -22,6 +22,11 @@ export const adminUserService = apiSlice.injectEndpoints({
       providesTags: ["Users"],
     }),
 
+    getAdminList: builder.query({
+      query: () => "admins",
+      providesTags: ["Admins"],
+    }),
+
     exportUsersCsv: builder.query({
       query: () => ({
         url: "export-csv",
@@ -64,7 +69,7 @@ export const adminUserService = apiSlice.injectEndpoints({
     updateUser: builder.mutation({
       query: ({ userId, ...userData }) => ({
         url: `updateUserFormData/${userId}/update`,
-        method: "PUT", 
+        method: "PUT",
         body: userData,
       }),
       invalidatesTags: ["Users"],
@@ -133,4 +138,5 @@ export const {
   useUpdateUserStatusMutation,
   useLazyExportUsersCsvQuery,
   useAllUsersQuery,
+  useGetAdminListQuery,
 } = adminUserService;

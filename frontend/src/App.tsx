@@ -45,7 +45,7 @@ const App = () => (
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute allowedRoles={[2,1]}>
+                <ProtectedRoute allowedRoles={[2,1,0]}>
                   <Dashboard />
                 </ProtectedRoute>
               }
@@ -53,7 +53,7 @@ const App = () => (
             <Route
               path="/dashboard/inbox-ordering"
               element={
-                <ProtectedRoute allowedRoles={[2,1]}>
+                <ProtectedRoute allowedRoles={[2,1,0]}>
                   <InboxOrdering />
                 </ProtectedRoute>
               }
@@ -61,7 +61,7 @@ const App = () => (
             <Route
               path="/dashboard/warmup"
               element={
-                <ProtectedRoute allowedRoles={[2,1]}>
+                <ProtectedRoute allowedRoles={[2,1,0]}>
                   <EmailWarmup />
                 </ProtectedRoute>
               }
@@ -69,7 +69,7 @@ const App = () => (
             <Route
               path="/dashboard/placement-test"
               element={
-                <ProtectedRoute allowedRoles={[2,1]}>
+                <ProtectedRoute allowedRoles={[2,1,0]}>
                   <PlacementTest />
                 </ProtectedRoute>
               }
@@ -77,7 +77,7 @@ const App = () => (
             <Route
               path="/dashboard/verification"
               element={
-                <ProtectedRoute allowedRoles={[2,1]}>
+                <ProtectedRoute allowedRoles={[2,1,0]}>
                   <EmailVerification />
                 </ProtectedRoute>
               }
@@ -85,7 +85,7 @@ const App = () => (
             <Route
               path="/dashboard/integrations"
               element={
-                <ProtectedRoute allowedRoles={[2,1]}>
+                <ProtectedRoute allowedRoles={[2,1,0]}>
                   <Integrations />
                 </ProtectedRoute>
               }
@@ -93,7 +93,7 @@ const App = () => (
             <Route
               path="/dashboard/support"
               element={
-                <ProtectedRoute allowedRoles={[2,1]}>
+                <ProtectedRoute allowedRoles={[2,1,0]}>
                   <Support />
                 </ProtectedRoute>
               }
@@ -101,7 +101,7 @@ const App = () => (
             <Route
               path="/dashboard/settings"
               element={
-                <ProtectedRoute allowedRoles={[2,1]}>
+                <ProtectedRoute allowedRoles={[2,1,0]}>
                   <Settings />
                 </ProtectedRoute>
               }
@@ -111,7 +111,7 @@ const App = () => (
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRoles={[1]}>
+                <ProtectedRoute allowedRoles={[1,0]}>
                   <AdminDashboard />
                 </ProtectedRoute>
               }
@@ -119,7 +119,7 @@ const App = () => (
             <Route
               path="/admin/users"
               element={
-                <ProtectedRoute allowedRoles={[1]}>
+                <ProtectedRoute allowedRoles={[1,0]}>
                   <AdminUsers />
                 </ProtectedRoute>
               }
@@ -127,7 +127,7 @@ const App = () => (
             <Route
               path="/admin/domains"
               element={
-                <ProtectedRoute allowedRoles={[1]}>
+                <ProtectedRoute allowedRoles={[1,0]}>
                   <AdminDomains />
                 </ProtectedRoute>
               }
@@ -135,7 +135,7 @@ const App = () => (
             <Route
               path="/admin/inboxes"
               element={
-                <ProtectedRoute allowedRoles={[1]}>
+                <ProtectedRoute allowedRoles={[1,0]}>
                   <AdminInboxes />
                 </ProtectedRoute>
               }
@@ -143,7 +143,7 @@ const App = () => (
             <Route
               path="/admin/warmups"
               element={
-                <ProtectedRoute allowedRoles={[1]}>
+                <ProtectedRoute allowedRoles={[1,0]}>
                   <AdminWarmups />
                 </ProtectedRoute>
               }
@@ -151,7 +151,7 @@ const App = () => (
             <Route
               path="/admin/integrations"
               element={
-                <ProtectedRoute allowedRoles={[1]}>
+                <ProtectedRoute allowedRoles={[1,0]}>
                   <AdminIntegrations />
                 </ProtectedRoute>
               }
@@ -159,7 +159,7 @@ const App = () => (
             <Route
               path="/admin/server-monitoring"
               element={
-                <ProtectedRoute allowedRoles={[1]}>
+                <ProtectedRoute allowedRoles={[1,0]}>
                   <AdminServerMonitoring />
                 </ProtectedRoute>
               }
@@ -167,7 +167,7 @@ const App = () => (
             <Route
               path="/admin/support"
               element={
-                <ProtectedRoute allowedRoles={[1]}>
+                <ProtectedRoute allowedRoles={[1,0]}>
                   <AdminSupport />
                 </ProtectedRoute>
               }
@@ -175,7 +175,7 @@ const App = () => (
             <Route
               path="/admin/settings"
               element={
-                <ProtectedRoute allowedRoles={[1]}>
+                <ProtectedRoute allowedRoles={[1,0]}>
                   <AdminSettings />
                 </ProtectedRoute>
               }
