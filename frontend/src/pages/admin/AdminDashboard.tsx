@@ -66,7 +66,8 @@ import { useGetAdminListQuery } from "@/services/adminUserService";
 import {
   useAddAdminNoteMutation,
   useGetAdminNotesQuery,
-  useAddAdminNoteReplyMutation
+  useAddAdminNoteReplyMutation,
+  useDeleteNoteWithRepliesMutation,
 } from "@/services/adminNoteService";
 
 import { useSelector } from "react-redux";
@@ -491,10 +492,8 @@ const AdminDashboard = () => {
     //fetchAdminNotes();
   };
 
-
   const [addAdminNoteReply] = useAddAdminNoteReplyMutation();
-  const handleReply = async (parentNoteId: string,assignId) => {
-   
+  const handleReply = async (parentNoteId: string, assignId) => {
     if (!replyText.trim()) {
       toast({
         title: "Error",
@@ -518,10 +517,10 @@ const AdminDashboard = () => {
     }
 
     const replyData = {
-       note_id:parentNoteId, 
-       user_id:assignId, 
-       reply_text:replyText
-    }
+      note_id: parentNoteId,
+      user_id: assignId,
+      reply_text: replyText,
+    };
 
     const res = await addAdminNoteReply(replyData);
     console.log("replay ticket", res);
@@ -552,28 +551,36 @@ const AdminDashboard = () => {
     //fetchAdminNotes();
   };
 
-  const handleDeleteNote = async (noteId: string) => {
-    const { error } = await supabase
-      .from("admin_notes")
-      .delete()
-      .eq("id", noteId);
+  const [deleteNoteWithReplies] = useDeleteNoteWithRepliesMutation();
 
-    if (error) {
-      console.error("Error deleting note:", error);
+  const handleDeleteNote = async (noteId: string) => {
+    // const { error } = await supabase
+    //   .from("admin_notes")
+    //   .delete()
+    //   .eq("id", noteId);
+
+    // if (error) {
+    //   console.error("Error deleting note:", error);
+    //   toast({
+    //     title: "Error",
+    //     description: "Failed to delete note",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
+
+    if (!window.confirm("Are you sure you want to delete this note?")) return;
+    try {
+      await deleteNoteWithReplies(noteId);
       toast({
-        title: "Error",
-        description: "Failed to delete note",
-        variant: "destructive",
+        title: "Success",
+        description: "Note deleted successfully",
       });
-      return;
+    } catch (error) {
+      console.log("Failed to delete note");
     }
 
-    toast({
-      title: "Success",
-      description: "Note deleted successfully",
-    });
-
-    fetchAdminNotes();
+    //fetchAdminNotes();
   };
 
   const handleAssignNote = async (noteId: string, userId: string) => {
@@ -925,8 +932,7 @@ const AdminDashboard = () => {
                                   className="text-[10px] px-2 py-0"
                                 >
                                   <UserPlus className="h-2 w-2 mr-1" />
-                                  {note.assignee.name ||
-                                    note.assignee.email}
+                                  {note.assignee.name || note.assignee.email}
                                 </Badge>
                               </div>
                             )}
@@ -979,7 +985,9 @@ const AdminDashboard = () => {
                               <div className="flex flex-col gap-2">
                                 <Button
                                   size="sm"
-                                  onClick={() => handleReply(note.id, note.assigned_to)}
+                                  onClick={() =>
+                                    handleReply(note.id, note.assigned_to)
+                                  }
                                   disabled={!replyText.trim()}
                                 >
                                   Send

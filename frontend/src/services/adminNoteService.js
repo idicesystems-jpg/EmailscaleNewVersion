@@ -26,6 +26,15 @@ export const adminNoteService = apiSlice.injectEndpoints({
   invalidatesTags: ["AdminNotes"],
 }),
 
+deleteNoteWithReplies: builder.mutation({
+  query: (id) => ({
+    url: `delete-notes/${id}`,
+    method: "DELETE",
+  }),
+  invalidatesTags: ["AdminNotes"],
+}),
+
+
   }),
   overrideExisting: false,
 });
@@ -33,5 +42,6 @@ export const adminNoteService = apiSlice.injectEndpoints({
 export const {
   useAddAdminNoteMutation,
   useGetAdminNotesQuery,
-  useAddAdminNoteReplyMutation
+  useAddAdminNoteReplyMutation,
+  useDeleteNoteWithRepliesMutation 
 } = adminNoteService;
