@@ -200,11 +200,87 @@ const getRepliesByNote = async (req, res) => {
   }
 };
 
+const deleteNoteWithReplies = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Find note
+    const note = await AdminNote.findByPk(id, { include: [{ model: AdminNoteReply, as: 'replies' }] });
+
+    if (!note) {
+      return res.status(404).json({ status: false, message: 'Note not found' });
+    }
+
+    // 2. Delete replies first (if any)
+    await AdminNoteReply.destroy({ where: { note_id: id } });
+
+    // 3. Delete the note itself
+    await note.destroy();
+
+    return res.json({
+      status: true,
+      message: 'Note and its replies deleted successfully',
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      status: false,
+      message: 'Internal Server Error',
+      error: error.message,
+    });
+  }
+};
+
+
+const reassignNote = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assigned_to } = req.body;
+
+    if (!assigned_to) {
+      return res.status(400).json({
+        status: false,
+        message: 'assigned_to field is required.',
+      });
+    }
+
+    // Find the note
+    const note = await AdminNote.findByPk(id);
+
+    if (!note) {
+      return res.status(404).json({
+        status: false,
+        message: 'Note not found.',
+      });
+    }
+
+    // Update only assigned_to
+    note.assigned_to = assigned_to;
+    await note.save();
+
+    return res.status(200).json({
+      status: true,
+      message: 'Note reassigned successfully.',
+      data: note,
+    });
+  } catch (error) {
+    console.error('Error reassigning note:', error);
+    return res.status(500).json({
+      status: false,
+      message: 'Internal Server Error',
+      error: error.message,
+    });
+  }
+};
+
+
 
 module.exports = {
   createNote,
   getAllNotes,
   replyToNote,
   addNoteAdminReply,
-  getRepliesByNote
+  getRepliesByNote,
+  deleteNoteWithReplies,
+  reassignNote
 };
