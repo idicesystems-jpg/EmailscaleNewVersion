@@ -988,6 +988,77 @@ const markNotificationsRead = async (req, res) => {
   }
 };
 
+const assignTicket = async (req, res) => {
+  try {
+    const { ticket_id, assigned_to } = req.body;
+    const roleId = req.user?.role_id;
+
+    // Only Super Admin (role_id = 0) can assign
+    if (roleId !== 0) {
+      return res.status(403).json({ message: "Only super admin can assign tickets" });
+    }
+
+    if (!ticket_id || !assigned_to) {
+      return res.status(400).json({ message: "ticket_id and assigned_to are required" });
+    }
+
+    // Find the ticket
+    const ticket = await Ticket.findByPk(ticket_id);
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    // Verify the assigned user is an admin (role_id = 1)
+    const adminUser = await User.findOne({
+      where: { id: assigned_to, role_id: 1 },
+    });
+
+    if (!adminUser) {
+      return res.status(400).json({ message: "Assigned user must be an admin" });
+    }
+
+    // Update assignment
+    ticket.assigned_to = assigned_to;
+    await ticket.save();
+
+    return res.status(200).json({
+      message: `Ticket #${ticket_id} successfully assigned to admin (${adminUser.name})`,
+      data: ticket,
+    });
+  } catch (err) {
+    console.error("Error assigning ticket:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getAdminList = async (req, res) => {
+  try{
+    const admins = await User.findAll({
+      where:{role_id:1},
+      attributes: ['id', 'name', 'email']
+    })
+
+    if(!admins.length){
+      return res.status(404).json({
+        message:"No Admins Found",
+        data:[]
+      })
+    }
+    return res.status(200).json({
+      status:true,
+      message: "Admins fetched successfully",
+      data: admins
+    })
+  }catch(err){
+   return res.status(500).json({
+    status: false,
+    message:"internal Server Error",
+    error: err.message
+   });
+    
+  }
+}
+
 module.exports = {
   createTicket,
   getAllTickets,
@@ -1001,4 +1072,6 @@ module.exports = {
   getUnreadCount,
   getNotificationsByEmail,
   markNotificationsRead,
+  assignTicket,
+  getAdminList
 };
