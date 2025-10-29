@@ -66,6 +66,7 @@ import { useGetAdminListQuery } from "@/services/adminUserService";
 import {
   useAddAdminNoteMutation,
   useGetAdminNotesQuery,
+  useAddAdminNoteReplyMutation
 } from "@/services/adminNoteService";
 
 import { useSelector } from "react-redux";
@@ -490,7 +491,10 @@ const AdminDashboard = () => {
     //fetchAdminNotes();
   };
 
-  const handleReply = async (parentNoteId: string) => {
+
+  const [addAdminNoteReply] = useAddAdminNoteReplyMutation();
+  const handleReply = async (parentNoteId: string,assignId) => {
+   
     if (!replyText.trim()) {
       toast({
         title: "Error",
@@ -500,9 +504,9 @@ const AdminDashboard = () => {
       return;
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // const {
+    //   data: { user },
+    // } = await supabase.auth.getUser();
 
     if (!user) {
       toast({
@@ -513,21 +517,30 @@ const AdminDashboard = () => {
       return;
     }
 
-    const { error } = await supabase.from("admin_notes").insert({
-      note: replyText.trim(),
-      created_by: user.id,
-      parent_note_id: parentNoteId,
-    });
-
-    if (error) {
-      console.error("Error adding reply:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add reply",
-        variant: "destructive",
-      });
-      return;
+    const replyData = {
+       note_id:parentNoteId, 
+       user_id:assignId, 
+       reply_text:replyText
     }
+
+    const res = await addAdminNoteReply(replyData);
+    console.log("replay ticket", res);
+
+    // const { error } = await supabase.from("admin_notes").insert({
+    //   note: replyText.trim(),
+    //   created_by: user.id,
+    //   parent_note_id: parentNoteId,
+    // });
+
+    // if (error) {
+    //   console.error("Error adding reply:", error);
+    //   toast({
+    //     title: "Error",
+    //     description: "Failed to add reply",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
     toast({
       title: "Success",
@@ -536,7 +549,7 @@ const AdminDashboard = () => {
 
     setReplyText("");
     setReplyingTo(null);
-    fetchAdminNotes();
+    //fetchAdminNotes();
   };
 
   const handleDeleteNote = async (noteId: string) => {
@@ -959,14 +972,14 @@ const AdminDashboard = () => {
                                 className="min-h-[60px] resize-none flex-1 text-sm"
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" && e.ctrlKey) {
-                                    handleReply(note.id);
+                                    handleReply(note.id, note.assigned_to);
                                   }
                                 }}
                               />
                               <div className="flex flex-col gap-2">
                                 <Button
                                   size="sm"
-                                  onClick={() => handleReply(note.id)}
+                                  onClick={() => handleReply(note.id, note.assigned_to)}
                                   disabled={!replyText.trim()}
                                 >
                                   Send
@@ -996,7 +1009,7 @@ const AdminDashboard = () => {
                               className="p-4 pl-8 border-l-2 border-primary/20 ml-4 space-y-2"
                             >
                               <p className="text-sm text-foreground">
-                                {reply.note}
+                                {reply.reply_text}
                               </p>
                               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                 <div className="flex items-center gap-1">
@@ -1006,8 +1019,8 @@ const AdminDashboard = () => {
                                 <div className="flex items-center gap-1">
                                   <span>•</span>
                                   <span className="font-medium">
-                                    {reply.created_by_profile?.full_name ||
-                                      reply.created_by_profile?.email ||
+                                    {note.creator?.name ||
+                                      reply.creator?.email ||
                                       "Unknown"}
                                   </span>
                                 </div>

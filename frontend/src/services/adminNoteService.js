@@ -17,6 +17,15 @@ export const adminNoteService = apiSlice.injectEndpoints({
       query: () => "get-admin-notes",
       providesTags: ["AdminNotes"],
     }),
+    addAdminNoteReply: builder.mutation({
+  query: (replyData) => ({
+    url: "admin-note-replies",
+    method: "POST",
+    body: replyData,
+  }),
+  invalidatesTags: ["AdminNotes"],
+}),
+
   }),
   overrideExisting: false,
 });
@@ -24,4 +33,5 @@ export const adminNoteService = apiSlice.injectEndpoints({
 export const {
   useAddAdminNoteMutation,
   useGetAdminNotesQuery,
+  useAddAdminNoteReplyMutation
 } = adminNoteService;
