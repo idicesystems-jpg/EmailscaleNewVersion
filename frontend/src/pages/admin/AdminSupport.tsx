@@ -68,11 +68,13 @@ import {
   useAddTicketNoteMutation,
   useDeleteNoteMutation,
   useRateTicketMutation,
+  useAssignTicketMutation
 } from "@/services/ticketService";
 import { useAllUsersQuery } from "../../services/adminUserService";
 import { useSelector } from "react-redux";
 import Pagination from "../../components/Pagination";
 import SearchableSelect from "./SearchableSelect";
+import {useGetAdminListQuery } from "@/services/adminUserService";
 const API_URL = import.meta.env.VITE_API_URL;
 
 const AdminSupport = () => {
@@ -134,6 +136,10 @@ const AdminSupport = () => {
 
   const { data: users } = useAllUsersQuery();
   //console.log("Users:", users?.users);
+
+   const { data: admins} = useGetAdminListQuery();
+    const adminUsers = admins?.data || [];
+    console.log("admin",admins?.data);
 
   const [createTicket] = useCreateTicketMutation();
 
@@ -222,14 +228,26 @@ const AdminSupport = () => {
     }
   };
 
+
+  
+  const [assignTicket, { isLoading }] = useAssignTicketMutation();
+
   const handleAssignTicket = async (
     ticketId: string,
     adminId: string | null
   ) => {
-    const { error } = await supabase
-      .from("support_tickets")
-      .update({ assigned_to: adminId })
-      .eq("id", ticketId);
+
+    const assignData ={
+       ticket_id:ticketId, 
+       assigned_to: adminId
+    }
+  
+    const res = await assignTicket(assignData).unwrap();
+    console.log("res", res);
+    // const { error } = await supabase
+    //   .from("support_tickets")
+    //   .update({ assigned_to: adminId })
+    //   .eq("id", ticketId);
 
     if (error) {
       toast.error("Error assigning ticket");
@@ -753,11 +771,10 @@ const AdminSupport = () => {
                               <SelectItem value="unassigned">
                                 Unassigned
                               </SelectItem>
-                              {users?.users
-                                .filter((u) => u.id)
+                              {adminUsers?.filter((u) => u.id)
                                 .map((user) => (
                                   <SelectItem key={user.id} value={user.id}>
-                                    {user.full_name || user.email}
+                                    {user.name || user.email}
                                   </SelectItem>
                                 ))}
                             </SelectContent>

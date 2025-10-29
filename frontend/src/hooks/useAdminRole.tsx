@@ -71,7 +71,7 @@
 import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 
-export type AdminRole = 'admin' | 'user' | null;
+export type AdminRole = 'super_admin'|'admin' | 'user' | null;
 
 export const useAdminRole = () => {
   const { user, isAuthenticated } = useSelector((state: any) => state.auth);
@@ -92,9 +92,12 @@ export const useAdminRole = () => {
       }
 
       // Determine role based on role_id
-      if (user.role_id === 1) {
+      if (user.role_id === 0) {
+        setAdminRole("super_admin");
+      }else if (user.role_id === 1) {
         setAdminRole("admin");
-      } else if (user.role_id === 2) {
+      }
+      else if (user.role_id === 2) {
         setAdminRole("user");
       } else {
         setAdminRole(null);
@@ -108,11 +111,11 @@ export const useAdminRole = () => {
   };
 
   // Permission flags based on role
-  const canEdit = adminRole === "admin";
-  const canDelete = adminRole === "admin";
-  const canManageAdmins = adminRole === "admin";
+  const canEdit = adminRole === 'super_admin' || adminRole === "admin";
+  const canDelete = adminRole === 'super_admin' || adminRole === "admin";
+  const canManageAdmins = adminRole === 'super_admin';
   const isViewer = adminRole === "user";
-  const isAdmin = adminRole === "admin";
+  const isAdmin = adminRole === "super_admin" || adminRole === "admin";
 
   return {
     adminRole,

@@ -129,6 +129,15 @@ export const ticketService = apiSlice.injectEndpoints({
         method: "POST",
       }),
     }),
+
+    assignTicket: builder.mutation({
+      query: (assignData) => ({
+        url: "tickets/assign",
+        method: "POST",
+        body: assignData,
+      }),
+      invalidatesTags: ["Tickets"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -148,4 +157,5 @@ export const {
   useNotificationsUnreadCountQuery,
   useNotificationsByEmailQuery,
   useMarkNotificationsReadMutation,
+  useAssignTicketMutation
 } = ticketService;
