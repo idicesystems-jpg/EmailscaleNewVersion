@@ -103,6 +103,10 @@ const {
   stopImpersonation,
   getActiveImpersonation,
 } = require("../controllers/impersonationController");
+
+const { createNote, getAllNotes, addNoteAdminReply } = require("../controllers/adminNoteController");
+
+
 // Routes
 router.post("/login", login);
 
@@ -200,4 +204,9 @@ router.post('/impersonate/start',startImpersonation);
 router.post('/impersonate/stop',stopImpersonation);
 router.get('/impersonate/active/:adminId',getActiveImpersonation);
 
+
+//Admin notes controller routes
+router.post("/add-admin-notes", createNote);
+router.get("/get-admin-notes", getAllNotes);
+router.post('/admin-note-replies', addNoteAdminReply);
 module.exports = router;
