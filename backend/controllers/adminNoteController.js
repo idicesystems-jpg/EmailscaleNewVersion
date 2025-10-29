@@ -273,6 +273,37 @@ const reassignNote = async (req, res) => {
   }
 };
 
+const deleteNoteReply = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the reply by ID
+    const reply = await AdminNoteReply.findByPk(id);
+
+    if (!reply) {
+      return res.status(404).json({
+        status: false,
+        message: 'Reply not found.',
+      });
+    }
+
+    // Delete the reply
+    await reply.destroy();
+
+    return res.status(200).json({
+      status: true,
+      message: 'Reply deleted successfully.',
+    });
+  } catch (error) {
+    console.error('Error deleting reply:', error);
+    return res.status(500).json({
+      status: false,
+      message: 'Internal Server Error',
+      error: error.message,
+    });
+  }
+};
+
 
 
 module.exports = {
@@ -282,5 +313,6 @@ module.exports = {
   addNoteAdminReply,
   getRepliesByNote,
   deleteNoteWithReplies,
-  reassignNote
+  reassignNote,
+  deleteNoteReply
 };
