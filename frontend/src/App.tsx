@@ -26,6 +26,7 @@ import AdminServerMonitoring from "./pages/admin/AdminServerMonitoring";
 import AdminSettings from "./pages/admin/AdminSettings";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminIntegrations from "./pages/admin/AdminIntegrations";
 
 const queryClient = new QueryClient();
 
@@ -144,6 +145,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={[1]}>
                   <AdminWarmups />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/integrations"
+              element={
+                <ProtectedRoute allowedRoles={[1]}>
+                  <AdminIntegrations />
                 </ProtectedRoute>
               }
             />

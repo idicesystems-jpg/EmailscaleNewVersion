@@ -208,16 +208,22 @@ const DomainTable: React.FC<DomainTableProps> = ({
               />
             </th>
             <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
-              Domain
+              Domain Name
             </th>
             <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
-              User
+              Owner
             </th>
+             <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+              Registrar
+            </th>       
             <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
               Purchase Date
             </th>
             <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
               Expiry Date
+            </th>
+             <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
+              Days Until Expiry
             </th>
             <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
               Status
@@ -277,6 +283,11 @@ const DomainTable: React.FC<DomainTableProps> = ({
                     </span>
                   </div>
                 </td>
+                 <td className="px-6 py-4">
+                  <span className="text-sm text-foreground">
+                    {firstDomain.registered || "—"}
+                  </span>
+                </td>
 
                 <td className="px-6 py-4">
                   <span className="text-sm text-foreground">
@@ -289,6 +300,12 @@ const DomainTable: React.FC<DomainTableProps> = ({
                 <td className="px-6 py-4">
                   <span className="text-sm text-foreground">
                     {formatDate(firstDomain.expiry_date)}
+                  </span>
+                </td>
+
+                 <td className="px-6 py-4">
+                  <span className="text-sm text-foreground">
+                     {"—"}
                   </span>
                 </td>
 

@@ -38,6 +38,7 @@ import {
   UserPlus,
   Globe,
 } from "lucide-react";
+import { useImpersonation } from "@/hooks/useImpersonation";
 import {
   useCreateDomainMutation,
   useFetchDomainsQuery,
@@ -51,6 +52,7 @@ import DomainTable from "../../components/DomainTable";
 import Pagination from "../../components/Pagination";
 
 const AdminDomains = () => {
+  const { impersonatedUserId } = useImpersonation();
   const [domains, setDomains] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -209,7 +211,7 @@ const AdminDomains = () => {
 
   useEffect(() => {
     fetchDomains();
-  }, []);
+  }, [impersonatedUserId]);
 
   const fetchDomains = async () => {
     setLoading(true);
@@ -275,6 +277,32 @@ const AdminDomains = () => {
     }
   };
 
+  const handleDeleteAllDomains = async () => {
+    const confirmation = prompt(
+      `⚠️ DANGER: This will permanently delete ALL ${domains.length} domains.\n\nType "DELETE ALL DOMAINS" to confirm:`
+    );
+
+    if (confirmation !== "DELETE ALL DOMAINS") {
+      if (confirmation !== null) {
+        toast.error("Deletion cancelled - confirmation text did not match");
+      }
+      return;
+    }
+
+    const { error } = await supabase
+      .from("domains")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+
+    if (error) {
+      toast.error("Error deleting all domains");
+      console.error(error);
+    } else {
+      toast.success(`All ${domains.length} domains deleted successfully`);
+      fetchDomains();
+    }
+  };
+
   const downloadCSVTemplate = () => {
     const template = `domain_name,user_email,registrar,purchase_date,expiry_date,status,notes
 example.com,user@example.com,GoDaddy,2024-01-01,2025-01-01,active,Sample domain
@@ -331,6 +359,16 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
     }
   };
 
+  const filteredDomains = domains.filter((domain) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      domain.domain_name?.toLowerCase().includes(query) ||
+      domain.profiles?.full_name?.toLowerCase().includes(query) ||
+      domain.profiles?.email?.toLowerCase().includes(query) ||
+      domain.registrar?.toLowerCase().includes(query)
+    );
+  });
+
   // const getDaysUntilExpiry = (expiryDate: string) => {
   //   if (!expiryDate) return null;
   //   const today = new Date();
@@ -358,13 +396,21 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">
-            Domain Management
-          </h1>
-          <p className="text-muted-foreground">
-            Track domain ownership and expiry dates
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">
+              Domain Management
+            </h1>
+            <p className="text-muted-foreground">
+              Track domain ownership and expiry dates
+            </p>
+          </div>
+          {/* {data?.length > 0 && ( */}
+            <Button variant="destructive" onClick={handleDeleteAllDomains}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All Domains
+            </Button>
+          {/* )} */}
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -723,7 +769,12 @@ mysite.org,user@example.com,Namecheap,2024-02-15,2025-02-15,pending,Another exam
               setSelectedIds={setSelectedIds}
             />
             {/* Pagination Controls */}
-            <Pagination page={page} setPage={setPage} limit={limit} total={data?.total} />
+            <Pagination
+              page={page}
+              setPage={setPage}
+              limit={limit}
+              total={data?.total}
+            />
           </CardContent>
         </Card>
       </div>

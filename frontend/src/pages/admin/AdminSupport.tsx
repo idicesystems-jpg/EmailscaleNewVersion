@@ -38,7 +38,24 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Trash2, Plus, MessageSquare, User, Clock } from "lucide-react";
+import {
+  Trash2,
+  Plus,
+  MessageSquare,
+  User,
+  Clock,
+  TrendingUp,
+  Calendar,
+  Bell,
+  Send,
+} from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 import {
   useCreateTicketMutation,
   useGetAllTicketsQuery,
@@ -81,6 +98,14 @@ const AdminSupport = () => {
   const [newNote, setNewNote] = useState("");
   const [file, setFile] = useState(null);
   const [ticketId, setTicketId] = useState(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [newTicketsCount, setNewTicketsCount] = useState(0);
+  const [newRepliesCount, setNewRepliesCount] = useState(0);
+  const [ticketStats, setTicketStats] = useState({
+    last24h: 0,
+    last7days: 0,
+    last30days: 0,
+  });
   const bottomRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [rating, setRating] = useState("");
@@ -103,7 +128,7 @@ const AdminSupport = () => {
     priority: filter.priority,
   });
 
-  console.log("data", data);
+  //console.log("data", data);
 
   const tickets = data?.data || [];
 
@@ -336,13 +361,124 @@ const AdminSupport = () => {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">
-            Support Tickets
-          </h1>
-          <p className="text-muted-foreground">Manage all support requests</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">
+              Support Tickets
+            </h1>
+            <p className="text-muted-foreground">Manage all support requests</p>
+          </div>
+
+          <TooltipProvider>
+            <div className="flex items-center gap-4">
+              {(newTicketsCount > 0 || newRepliesCount > 0) && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="relative">
+                      <Bell className="h-6 w-6 text-primary" />
+                      {newTicketsCount + newRepliesCount > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                        >
+                          {newTicketsCount + newRepliesCount}
+                        </Badge>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      {newTicketsCount} new ticket
+                      {newTicketsCount !== 1 ? "s" : ""}
+                    </p>
+                    <p>
+                      {newRepliesCount} new repl
+                      {newRepliesCount !== 1 ? "ies" : "y"}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => {
+                      setNewTicketsCount(0);
+                      setNewRepliesCount(0);
+                      fetchTickets();
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Clear Notifications
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Mark all notifications as read</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
 
+        {/* Ticket Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-border">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Last 24 Hours
+                </CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline gap-2">
+                <p className="text-3xl font-bold text-foreground">
+                  {ticketStats.last24h}
+                </p>
+                <p className="text-sm text-muted-foreground">tickets</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Last 7 Days
+                </CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline gap-2">
+                <p className="text-3xl font-bold text-foreground">
+                  {ticketStats.last7days}
+                </p>
+                <p className="text-sm text-muted-foreground">tickets</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Last 30 Days
+                </CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline gap-2">
+                <p className="text-3xl font-bold text-foreground">
+                  {ticketStats.last30days}
+                </p>
+                <p className="text-sm text-muted-foreground">tickets</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
         <Card className="border-border">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -553,7 +689,7 @@ const AdminSupport = () => {
                         className="cursor-pointer hover:bg-muted/50"
                       >
                         <TableCell className="font-medium">
-                          {ticket.id}
+                          TICK-{ticket.id}
                         </TableCell>
                         <TableCell>
                           {ticket.user.name || ticket.profiles?.email || "—"}
@@ -665,15 +801,37 @@ const AdminSupport = () => {
         <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-primary" />
-                Ticket Details - {selectedTicket?.id}
-              </DialogTitle>
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    TICK - {selectedTicket?.id}
+                  </DialogTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {selectedTicket?.user?.name || "-"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={
+                      selectedTicket?.priority === "high"
+                        ? "destructive"
+                        : selectedTicket?.priority === "medium"
+                        ? "secondary"
+                        : "default"
+                    }
+                  >
+                    {selectedTicket?.priority}
+                  </Badge>
+                  <Badge variant="outline">{selectedTicket?.status}</Badge>
+                </div>
+              </div>
             </DialogHeader>
+
             {selectedTicket && (
               <div className="space-y-6">
                 {/* Ticket Info */}
-                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/20 rounded-lg">
+                {/* <div className="grid grid-cols-2 gap-4 p-4 bg-muted/20 rounded-lg">
                   <div>
                     <p className="text-sm text-muted-foreground">User</p>
                     <p className="font-medium flex items-center gap-2">
@@ -706,10 +864,10 @@ const AdminSupport = () => {
                     <p className="text-sm text-muted-foreground">Status</p>
                     <Badge variant="outline">{selectedTicket.status}</Badge>
                   </div>
-                </div>
+                </div> */}
 
                 {/* Subject & Description */}
-                <div className="space-y-3">
+                {/* <div className="space-y-3">
                   <div>
                     <Label className="text-sm text-muted-foreground">
                       Subject
@@ -724,7 +882,7 @@ const AdminSupport = () => {
                       {selectedTicket.message || "No description provided"}
                     </p>
                   </div>
-                </div>
+                </div> */}
 
                 {/* conversation section */}
 
@@ -772,29 +930,31 @@ const AdminSupport = () => {
                       <div className="px-3 pt-4">
                         <div className="mb-4">
                           {replies.map((reply) => (
-                            <div key={reply.id} className="d-flex mb-3">
+                            <div key={reply.id} className="flex gap-3 mb-3">
                               <div
                                 className="rounded-circle text-white d-flex justify-content-center align-items-center"
                                 style={{
                                   width: 40,
                                   height: 40,
                                   fontWeight: "bold",
-                                  backgroundColor: "#d946ef",
+                                  backgroundColor: "#e236a91a",
                                   borderRadius: "50%",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   display: "flex",
+                                  borderColor:"#e236a91a",
+                                  color:"#e236a9",
                                 }}
                               >
                                 {getInitials(reply.user.name)}
                               </div>
                               <div
-                                className={`ms-2 me-2 p-3 rounded shadow-sm ${
-                                  reply.name === "Admin"
-                                    ? "bg-light border"
-                                    : "bg-white border"
-                                }`}
-                                style={{ maxWidth: "85%" }}
+                                // className={`ms-2 me-2 p-3 rounded shadow-sm ${
+                                //   reply.name === "Admin"
+                                //     ? "bg-light border"
+                                //     : "bg-white border"
+                                // }`}
+                                style={{ maxWidth: "85%", width:"100%" }}
                               >
                                 <div className="mb-1">
                                   <strong>{reply.user.name}</strong>{" "}
@@ -807,7 +967,10 @@ const AdminSupport = () => {
                                     ).toLocaleString()}
                                   </small>
                                 </div>
-                                <p className="mb-1">{reply.message}</p>
+                               
+                                 <div className="bg-muted/50 rounded-lg p-3">
+                              <p className="text-sm whitespace-pre-wrap">{reply.message}</p>
+                            </div>
 
                                 {reply.file && (
                                   <a
@@ -856,6 +1019,7 @@ const AdminSupport = () => {
                                   role="status"
                                 />
                               ) : (
+                                // <Send className="h-4 w-4" />
                                 "Send Reply"
                               )}
                             </Button>
@@ -920,7 +1084,7 @@ const AdminSupport = () => {
                 </div>
 
                 {/* Notes Section */}
-                <div className="space-y-3">
+                {/* <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-lg font-semibold">
                       Internal Notes
@@ -942,11 +1106,7 @@ const AdminSupport = () => {
                           className="p-3 bg-muted/20 rounded-lg space-y-2"
                         >
                           <div className="flex items-center justify-between">
-                            {/* <p className="text-sm font-medium">
-                              {note.admin?.full_name ||
-                                note.admin?.email ||
-                                "Admin"}
-                            </p> */}
+                           
                             <p className="text-xs text-muted-foreground">
                               {new Date(note.created_at).toLocaleString()}
                             </p>
@@ -967,7 +1127,7 @@ const AdminSupport = () => {
                     )}
                   </div>
 
-                  {/* Add Note */}
+                  
                   <div className="space-y-2 pt-4 border-t">
                     <Label>Add Note</Label>
                     <Textarea
@@ -985,9 +1145,12 @@ const AdminSupport = () => {
                       Add Note
                     </Button>
                   </div>
-                </div>
+                </div> */}
               </div>
             )}
+
+
+
           </DialogContent>
         </Dialog>
       </div>

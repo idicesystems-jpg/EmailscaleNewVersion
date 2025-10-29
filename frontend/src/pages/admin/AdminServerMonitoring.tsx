@@ -2,677 +2,676 @@ import { useEffect, useState, useMemo } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Server, AlertTriangle, CheckCircle, XCircle, RefreshCw, Plus, Search } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { 
+  Server, 
+  Activity, 
+  Globe, 
+  Shield, 
+  TrendingUp, 
+  Cpu,
+  Mail,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  RefreshCw
+} from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const AdminServerMonitoring = () => {
-  const [monitoredIPs, setMonitoredIPs] = useState<any[]>([]);
-  const [blacklistChecks, setBlacklistChecks] = useState<any[]>([]);
-  const [spamComplaints, setSpamComplaints] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checking, setChecking] = useState(false);
-  const [addIPDialogOpen, setAddIPDialogOpen] = useState(false);
-  const [addComplaintDialogOpen, setAddComplaintDialogOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [newIP, setNewIP] = useState({
-    ip_address: "",
-    hostname: "",
-    server_location: "",
-    notes: ""
-  });
-  const [newComplaint, setNewComplaint] = useState({
-    email_address: "",
-    complaint_type: "manual",
-    complaint_source: "",
-    complaint_details: "",
-    ip_address: ""
-  });
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  
+  // Expandable sections state
+  const [blacklistBreakdownOpen, setBlacklistBreakdownOpen] = useState(false);
+  const [blacklistedIPsOpen, setBlacklistedIPsOpen] = useState(false);
+  const [warningDomainsOpen, setWarningDomainsOpen] = useState(false);
+  const [criticalDomainsOpen, setCriticalDomainsOpen] = useState(false);
+
+  // Mock data - replace with real API calls
+  const systemStatus = {
+    overall: "GREEN",
+    queueHealth: "GREEN",
+    domainHealth: "YELLOW",
+    ipReputation: "RED",
+    sendingRate: "GREEN",
+    serverPerformance: "GREEN"
+  };
+
+  const metrics = {
+    sentToday: 113258,
+    sentWeek: 1026957,
+    sentMonth: 4241367,
+    queueCount: 419
+  };
+
+  const queueByAge = {
+    "0-6h": { count: 6, percentage: 1.4 },
+    "6-36h": { count: 212, percentage: 50.6 },
+    "3-7d": { count: 201, percentage: 48.0 },
+    "8+d": { count: 0, percentage: 0 }
+  };
+
+  const queueByProvider = {
+    yahoo: 98,
+    gmail: 111,
+    outlook: 0,
+    other: 210
+  };
+
+  const ipReputation = {
+    totalIPs: 165,
+    cleanIPs: 11,
+    blacklistedIPs: 154,
+    blacklistPercentage: 93.3
+  };
+
+  const rblBreakdown = [
+    { name: "Spamhaus ZEN", count: 45 },
+    { name: "SpamCop", count: 32 },
+    { name: "SORBS", count: 28 },
+    { name: "Barracuda", count: 15 },
+    { name: "PSBL", count: 12 },
+    { name: "UCEPROTECT-1", count: 8 },
+    { name: "UCEPROTECT-2", count: 5 },
+    { name: "UCEPROTECT-3", count: 4 },
+    { name: "Mailspike", count: 3 },
+    { name: "DroneBL", count: 2 }
+  ];
+
+  const blacklistedIPs = [
+    { ip: "192.168.1.100", blacklists: "Spamhaus ZEN, SpamCop, SORBS" },
+    { ip: "192.168.1.101", blacklists: "Barracuda, PSBL" },
+    { ip: "192.168.1.102", blacklists: "UCEPROTECT-1, Mailspike" }
+  ];
+
+  const domainHealth = {
+    totalDomains: 1613,
+    healthyDomains: 1503,
+    warningDomains: 1,
+    criticalDomains: 109,
+    healthPercentage: 93.2
+  };
+
+  const warningDomains = [
+    { domain: "example1.com", missingRecords: "SPF" }
+  ];
+
+  const criticalDomains = [
+    { domain: "example2.com", missingRecords: "SPF, DKIM" },
+    { domain: "example3.com", missingRecords: "SPF, DMARC" }
+  ];
+
+  const providerPerformance = [
+    { provider: "Yahoo / AOL", successRate: 15, sent: 832, deferred: 4548 },
+    { provider: "Gmail", successRate: 99, sent: 21182, deferred: 106 },
+    { provider: "Outlook / Hotmail", successRate: 98, sent: 7208, deferred: 104 },
+    { provider: "Other Domains", successRate: 100, sent: 83710, deferred: 0 }
+  ];
+
+  const serverHealth = {
+    cpuUsage: 2.3,
+    ramUsage: 37,
+    diskUsage: 10,
+    eximStatus: "active",
+    uptime: "2 days, 12 hours, 37 minutes"
+  };
+
+  const bounceStats = {
+    hardBounces: 0,
+    softBounces: 132,
+    totalBounces: 132,
+    bounceRate: 0.1
+  };
 
   useEffect(() => {
     fetchData();
-  }, []);
+    
+    // Auto-refresh every 2 minutes
+    if (autoRefresh) {
+      const interval = setInterval(() => {
+        fetchData();
+      }, 120000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh]);
 
   const fetchData = async () => {
     setLoading(true);
-    await Promise.all([
-      fetchMonitoredIPs(),
-      fetchBlacklistChecks(),
-      fetchSpamComplaints()
-    ]);
+    // Fetch real data here
+    setLastUpdated(new Date());
     setLoading(false);
   };
 
-  const fetchMonitoredIPs = async () => {
-    const { data, error } = await supabase
-      .from('monitored_ips')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error("Error fetching monitored IPs");
-      console.error(error);
-    } else {
-      setMonitoredIPs(data || []);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "GREEN": return "bg-green-500/20 text-green-500 border-green-500/50";
+      case "YELLOW": return "bg-yellow-500/20 text-yellow-500 border-yellow-500/50";
+      case "RED": return "bg-red-500/20 text-red-500 border-red-500/50";
+      default: return "bg-muted text-muted-foreground";
     }
   };
 
-  const fetchBlacklistChecks = async () => {
-    const { data, error } = await supabase
-      .from('ip_blacklist_checks')
-      .select('*')
-      .order('checked_at', { ascending: false })
-      .limit(100);
-
-    if (error) {
-      toast.error("Error fetching blacklist checks");
-      console.error(error);
-    } else {
-      setBlacklistChecks(data || []);
-    }
+  const downloadCSV = (type: string) => {
+    toast.success(`Downloading ${type} CSV...`);
+    // Implement CSV download logic
   };
 
-  const fetchSpamComplaints = async () => {
-    const { data, error } = await supabase
-      .from('spam_complaints')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error("Error fetching spam complaints");
-      console.error(error);
-    } else {
-      setSpamComplaints(data || []);
-    }
-  };
-
-  const handleAddIP = async () => {
-    const { error } = await supabase
-      .from('monitored_ips')
-      .insert([newIP]);
-
-    if (error) {
-      toast.error("Error adding IP");
-      console.error(error);
-    } else {
-      toast.success("IP added successfully");
-      setAddIPDialogOpen(false);
-      setNewIP({ ip_address: "", hostname: "", server_location: "", notes: "" });
-      fetchMonitoredIPs();
-    }
-  };
-
-  const handleAddComplaint = async () => {
-    const { error } = await supabase
-      .from('spam_complaints')
-      .insert([newComplaint]);
-
-    if (error) {
-      toast.error("Error adding complaint");
-      console.error(error);
-    } else {
-      toast.success("Complaint added successfully");
-      setAddComplaintDialogOpen(false);
-      setNewComplaint({
-        email_address: "",
-        complaint_type: "manual",
-        complaint_source: "",
-        complaint_details: "",
-        ip_address: ""
-      });
-      fetchSpamComplaints();
-    }
-  };
-
-  const handleCheckBlacklists = async () => {
-    setChecking(true);
-    try {
-      const { error } = await supabase.functions.invoke('check-ip-blacklists');
-      
-      if (error) throw error;
-      
-      toast.success("Blacklist check completed");
-      fetchBlacklistChecks();
-    } catch (error) {
-      console.error("Error checking blacklists:", error);
-      toast.error("Error checking blacklists");
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  const handleResolveComplaint = async (id: string) => {
-    const { error } = await supabase
-      .from('spam_complaints')
-      .update({ resolved: true, resolved_at: new Date().toISOString() })
-      .eq('id', id);
-
-    if (error) {
-      toast.error("Error resolving complaint");
-    } else {
-      toast.success("Complaint resolved");
-      fetchSpamComplaints();
-    }
-  };
-
-  const filteredIPs = monitoredIPs.filter(ip =>
-    ip.ip_address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    ip.hostname?.toLowerCase().includes(searchQuery.toLowerCase())
+  const StatusBadge = ({ icon: Icon, label, status }: any) => (
+    <Badge variant="outline" className={`px-4 py-2 ${getStatusColor(status)}`}>
+      <Icon className="h-4 w-4 mr-2" />
+      <span className="font-medium">{label}</span>
+      <span className="ml-2 font-bold">{status}</span>
+    </Badge>
   );
-
-  const activeIPs = monitoredIPs.filter(ip => ip.status === 'active').length;
-  const blockedIPs = monitoredIPs.filter(ip => ip.status === 'blocked').length;
-  const recentBlacklisted = blacklistChecks.filter(check => 
-    check.is_blacklisted && 
-    new Date(check.checked_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  ).length;
-  const unresolvedComplaints = spamComplaints.filter(c => !c.resolved).length;
-
-  // Calculate complaint counts per email for repeat offenders
-  const complaintCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    spamComplaints.forEach(complaint => {
-      counts[complaint.email_address] = (counts[complaint.email_address] || 0) + 1;
-    });
-    return counts;
-  }, [spamComplaints]);
-
-  // Prepare chart data - group blacklist checks by day and calculate health score
-  const chartData = useMemo(() => {
-    const groupedByDay: Record<string, { date: string; healthy: number; warning: number; critical: number }> = {};
-    
-    blacklistChecks.forEach(check => {
-      const date = new Date(check.checked_at).toLocaleDateString();
-      if (!groupedByDay[date]) {
-        groupedByDay[date] = { date, healthy: 0, warning: 0, critical: 0 };
-      }
-      
-      if (check.is_blacklisted) {
-        // Check if same IP is blacklisted on multiple lists
-        const ipBlacklists = blacklistChecks.filter(c => 
-          c.ip_address === check.ip_address && 
-          c.is_blacklisted &&
-          new Date(c.checked_at).toLocaleDateString() === date
-        ).length;
-        
-        if (ipBlacklists >= 3) {
-          groupedByDay[date].critical++;
-        } else {
-          groupedByDay[date].warning++;
-        }
-      } else {
-        groupedByDay[date].healthy++;
-      }
-    });
-    
-    return Object.values(groupedByDay).sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    ).slice(-14); // Last 14 days
-  }, [blacklistChecks]);
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Server Monitoring</h1>
-          <p className="text-muted-foreground">Monitor IP reputation and spam complaints</p>
+      <div className="space-y-6 pb-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Activity className="h-8 w-8 text-primary" />
+              Email Server Dashboard
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                Updates every 2 minutes
+              </span>
+              <span className="mx-2">•</span>
+              Last: {lastUpdated.toLocaleString()}
+            </p>
+          </div>
+          <Button onClick={fetchData} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        {/* Top Status Bar */}
+        <div className="flex flex-wrap gap-3">
+          <StatusBadge icon={Server} label="System" status={systemStatus.overall} />
+          <StatusBadge icon={Activity} label="Queue" status={systemStatus.queueHealth} />
+          <StatusBadge icon={Globe} label="Domains" status={systemStatus.domainHealth} />
+          <StatusBadge icon={Shield} label="IP Reputation" status={systemStatus.ipReputation} />
+          <StatusBadge icon={TrendingUp} label="Sending" status={systemStatus.sendingRate} />
+          <StatusBadge icon={Cpu} label="Server" status={systemStatus.serverPerformance} />
+        </div>
+
+        {/* Big Metrics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Last Hour
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-primary">669</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-accent/10 to-accent/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Today
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-primary">{metrics.sentToday.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-secondary/20 to-secondary/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Week (Est)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-primary">{metrics.sentWeek.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-muted/50 to-muted/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Month (Est)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-primary">{metrics.sentMonth.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Queue Breakdown Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Queue by Age */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Server className="h-4 w-4" />
-                Active IPs
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Queue by Age
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-primary">{activeIPs}</div>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">0-6 hours</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold text-green-500">{queueByAge["0-6h"].count}</span>
+                  <span className="text-xs text-muted-foreground">{queueByAge["0-6h"].percentage}%</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">6-36 hours</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold">{queueByAge["6-36h"].count}</span>
+                  <span className="text-xs text-muted-foreground">{queueByAge["6-36h"].percentage}%</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">3-7 days</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold">{queueByAge["3-7d"].count}</span>
+                  <span className="text-xs text-muted-foreground">{queueByAge["3-7d"].percentage}%</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">8+ days</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold text-red-500">{queueByAge["8+d"].count}</span>
+                  <span className="text-xs text-muted-foreground">{queueByAge["8+d"].percentage}%</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
-          <Card className={blockedIPs > 0 ? "border-red-500" : ""}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-500" />
-                Blocked IPs
+
+          {/* Queue by Provider */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-primary" />
+                Queue by Provider
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-500">{blockedIPs}</div>
-            </CardContent>
-          </Card>
-          <Card className={recentBlacklisted > 0 ? "border-orange-500" : ""}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
-                Blacklisted (7d)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-500">{recentBlacklisted}</div>
-            </CardContent>
-          </Card>
-          <Card className={unresolvedComplaints > 0 ? "border-orange-500" : ""}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
-                Unresolved Complaints
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-500">{unresolvedComplaints}</div>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <span className="text-sm">Yahoo</span>
+                </div>
+                <span className="text-lg font-bold">{queueByProvider.yahoo}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <span className="text-sm">Gmail</span>
+                </div>
+                <span className="text-lg font-bold">{queueByProvider.gmail}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
+                  <span className="text-sm">Outlook</span>
+                </div>
+                <span className="text-lg font-bold">{queueByProvider.outlook}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-sm">Other</span>
+                </div>
+                <span className="text-lg font-bold">{queueByProvider.other}</span>
+              </div>
             </CardContent>
           </Card>
         </div>
 
+        {/* IP Reputation & Domain Health Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* IP Reputation */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                IP Reputation
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total IPs</span>
+                  <span className="text-lg font-bold">{ipReputation.totalIPs}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Clean
+                  </span>
+                  <span className="text-lg font-bold text-green-500">{ipReputation.cleanIPs}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    Blacklisted
+                  </span>
+                  <span className="text-lg font-bold text-red-500">{ipReputation.blacklistedIPs}</span>
+                </div>
+              </div>
+
+              <Collapsible open={blacklistBreakdownOpen} onOpenChange={setBlacklistBreakdownOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    <span className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      View Blacklist Breakdown (10 RBLs)
+                    </span>
+                    {blacklistBreakdownOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3 space-y-2">
+                  {rblBreakdown.map((rbl) => (
+                    <div key={rbl.name} className="flex justify-between items-center py-1">
+                      <span className="text-sm text-muted-foreground">{rbl.name}</span>
+                      <span className={`text-sm font-bold ${rbl.count > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                        {rbl.count}
+                      </span>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Collapsible open={blacklistedIPsOpen} onOpenChange={setBlacklistedIPsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="destructive" className="w-full justify-between">
+                    <span>View All Blacklisted IPs ({ipReputation.blacklistedIPs})</span>
+                    {blacklistedIPsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3 space-y-2">
+                  {blacklistedIPs.map((ip) => (
+                    <div key={ip.ip} className="border border-red-500/20 bg-red-500/5 rounded-lg p-3">
+                      <div className="font-mono text-sm font-bold">{ip.ip}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{ip.blacklists}</div>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+
+              <div className="text-xs text-muted-foreground">
+                Last checked: 2025-10-18 19:40:58
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Domain Health */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-primary" />
+                Domain Health
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Domains</span>
+                  <span className="text-lg font-bold">{domainHealth.totalDomains}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    Healthy
+                  </span>
+                  <span className="text-lg font-bold text-green-500">
+                    {domainHealth.healthyDomains} ({domainHealth.healthPercentage}%)
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    Warning
+                  </span>
+                  <span className="text-lg font-bold text-yellow-500">{domainHealth.warningDomains}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    Critical
+                  </span>
+                  <span className="text-lg font-bold text-red-500">{domainHealth.criticalDomains}</span>
+                </div>
+              </div>
+
+              <Collapsible open={warningDomainsOpen} onOpenChange={setWarningDomainsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between border-yellow-500/50">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                      View Warning Domains ({domainHealth.warningDomains})
+                    </span>
+                    {warningDomainsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3 space-y-2">
+                  {warningDomains.map((domain) => (
+                    <div key={domain.domain} className="border border-yellow-500/20 bg-yellow-500/5 rounded-lg p-3">
+                      <div className="font-medium text-sm">{domain.domain}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Missing: {domain.missingRecords}</div>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Collapsible open={criticalDomainsOpen} onOpenChange={setCriticalDomainsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="destructive" className="w-full justify-between">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      View Critical Domains ({domainHealth.criticalDomains})
+                    </span>
+                    {criticalDomainsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                  {criticalDomains.map((domain) => (
+                    <div key={domain.domain} className="border border-red-500/20 bg-red-500/5 rounded-lg p-3">
+                      <div className="font-medium text-sm">{domain.domain}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Missing: {domain.missingRecords}</div>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+
+              <div className="text-xs text-muted-foreground">
+                Last checked: 2025-10-18 22:01:08
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Provider Performance */}
         <Card>
           <CardHeader>
-            <CardTitle>Server Health Monitoring</CardTitle>
-            <CardDescription>14-day blacklist check status trend</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Provider Performance (Today's Deliveries)
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {chartData.length === 0 ? (
-              <p className="text-center text-muted-foreground p-8">No monitoring data available</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px'
-                    }}
-                  />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="healthy" 
-                    stroke="#22c55e" 
-                    strokeWidth={2}
-                    name="Healthy"
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="warning" 
-                    stroke="#f59e0b" 
-                    strokeWidth={2}
-                    name="Warning"
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="critical" 
-                    stroke="#ef4444" 
-                    strokeWidth={2}
-                    name="Critical"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {providerPerformance.map((provider) => (
+                <div key={provider.provider} className="border rounded-lg p-4 space-y-2">
+                  <div className="font-medium text-sm flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      provider.provider.includes('Yahoo') ? 'bg-yellow-500' :
+                      provider.provider.includes('Gmail') ? 'bg-blue-500' :
+                      provider.provider.includes('Outlook') ? 'bg-cyan-500' : 'bg-green-500'
+                    }`}></div>
+                    {provider.provider}
+                  </div>
+                  <div className="text-2xl font-bold">{provider.successRate}%</div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div>Sent: {provider.sent.toLocaleString()}</div>
+                    <div>Deferred: {provider.deferred.toLocaleString()}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <p className="text-xs text-muted-foreground">
+                <strong>Note:</strong> Provider stats show deliveries TO that provider only. Total sent (112,932) includes all providers. "Deferred" = temporarily delayed, will retry (not bounced).
+              </p>
+            </div>
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="ips" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="ips">Monitored IPs</TabsTrigger>
-            <TabsTrigger value="blacklists">Blacklist Checks</TabsTrigger>
-            <TabsTrigger value="complaints">Spam Complaints</TabsTrigger>
-          </TabsList>
+        {/* Server Health & Bounce Statistics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Server Health */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Server className="h-5 w-5 text-primary" />
+                Server Health
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">CPU Usage</span>
+                <span className="text-lg font-bold">{serverHealth.cpuUsage}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">RAM Usage</span>
+                <span className="text-lg font-bold">{serverHealth.ramUsage}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Disk Usage</span>
+                <span className="text-lg font-bold">{serverHealth.diskUsage}%</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Exim Status</span>
+                <Badge className="bg-green-500/20 text-green-500">{serverHealth.eximStatus}</Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Uptime</span>
+                <span className="text-sm font-medium">{serverHealth.uptime}</span>
+              </div>
+            </CardContent>
+          </Card>
 
-          <TabsContent value="ips">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Monitored IP Addresses</CardTitle>
-                    <CardDescription>Track and monitor server IPs</CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="relative w-64">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search IPs..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    <Button onClick={handleCheckBlacklists} disabled={checking}>
-                      <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
-                      Check Blacklists
-                    </Button>
-                    <Dialog open={addIPDialogOpen} onOpenChange={setAddIPDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add IP
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Add Monitored IP</DialogTitle>
-                          <DialogDescription>Add a new IP address to monitor</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <Label>IP Address</Label>
-                            <Input
-                              value={newIP.ip_address}
-                              onChange={(e) => setNewIP({...newIP, ip_address: e.target.value})}
-                              placeholder="192.168.1.1"
-                            />
-                          </div>
-                          <div>
-                            <Label>Hostname</Label>
-                            <Input
-                              value={newIP.hostname}
-                              onChange={(e) => setNewIP({...newIP, hostname: e.target.value})}
-                              placeholder="mail.example.com"
-                            />
-                          </div>
-                          <div>
-                            <Label>Server Location</Label>
-                            <Input
-                              value={newIP.server_location}
-                              onChange={(e) => setNewIP({...newIP, server_location: e.target.value})}
-                              placeholder="US-East"
-                            />
-                          </div>
-                          <div>
-                            <Label>Notes</Label>
-                            <Textarea
-                              value={newIP.notes}
-                              onChange={(e) => setNewIP({...newIP, notes: e.target.value})}
-                            />
-                          </div>
-                          <Button onClick={handleAddIP}>Add IP</Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+          {/* Bounce Statistics */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                Bounce Statistics (Today)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Hard Bounces</span>
+                <span className="text-lg font-bold text-red-500">{bounceStats.hardBounces}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Soft Bounces</span>
+                <span className="text-lg font-bold text-yellow-500">{bounceStats.softBounces}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Total Bounces</span>
+                <span className="text-lg font-bold">{bounceStats.totalBounces}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Bounce Rate</span>
+                <span className="text-lg font-bold">{bounceStats.bounceRate}%</span>
+              </div>
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Thresholds:</strong> &lt; 2% = <span className="text-green-500">GREEN</span> | 2-5% = <span className="text-yellow-500">YELLOW</span> | &gt; 5% = <span className="text-red-500">RED</span>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Download Reports */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5 text-primary" />
+              Download Reports
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="border-2 border-yellow-500/50 bg-yellow-500/5 rounded-lg p-6 text-center space-y-3">
+                <div className="text-4xl">🟡</div>
+                <div>
+                  <div className="font-bold text-lg">Warning Domains</div>
+                  <div className="text-sm text-muted-foreground">Missing 1 DNS record</div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex justify-center p-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : filteredIPs.length === 0 ? (
-                  <p className="text-center text-muted-foreground p-8">No monitored IPs</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>IP Address</TableHead>
-                        <TableHead>Hostname</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Added</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredIPs.map((ip) => (
-                        <TableRow key={ip.id}>
-                          <TableCell className="font-mono">{ip.ip_address}</TableCell>
-                          <TableCell>{ip.hostname || "—"}</TableCell>
-                          <TableCell>{ip.server_location || "—"}</TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              ip.status === 'active' ? 'bg-green-500/20 text-green-500' :
-                              ip.status === 'blocked' ? 'bg-red-500/20 text-red-500' :
-                              'bg-gray-500/20 text-gray-500'
-                            }`}>
-                              {ip.status}
-                            </span>
-                          </TableCell>
-                          <TableCell>{new Date(ip.created_at).toLocaleDateString()}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                <Button 
+                  onClick={() => downloadCSV('Warning Domains')} 
+                  variant="outline"
+                  className="w-full border-yellow-500/50 hover:bg-yellow-500/10"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download CSV
+                </Button>
+              </div>
 
-          <TabsContent value="blacklists">
-            <Card>
-              <CardHeader>
-                <CardTitle>Blacklist Check History</CardTitle>
-                <CardDescription>Recent DNS blacklist check results</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex justify-center p-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : blacklistChecks.length === 0 ? (
-                  <p className="text-center text-muted-foreground p-8">No blacklist checks yet</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>IP Address</TableHead>
-                        <TableHead>Blacklist</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Details</TableHead>
-                        <TableHead>Checked At</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {blacklistChecks.map((check) => (
-                        <TableRow key={check.id} className={check.is_blacklisted ? 'bg-red-500/10' : ''}>
-                          <TableCell className="font-mono">{check.ip_address}</TableCell>
-                          <TableCell>{check.blacklist_name}</TableCell>
-                          <TableCell>
-                            {check.is_blacklisted ? (
-                              <XCircle className="h-4 w-4 text-red-500" />
-                            ) : (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            )}
-                          </TableCell>
-                          <TableCell className="text-xs max-w-xs truncate">{check.response_details}</TableCell>
-                          <TableCell>{new Date(check.checked_at).toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="complaints">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Spam Complaints</CardTitle>
-                    <CardDescription>Track and manage spam complaints</CardDescription>
-                  </div>
-                  <Dialog open={addComplaintDialogOpen} onOpenChange={setAddComplaintDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Complaint
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Add Spam Complaint</DialogTitle>
-                        <DialogDescription>Record a spam complaint</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Email Address (that received complaint)</Label>
-                          <Input
-                            value={newComplaint.email_address}
-                            onChange={(e) => setNewComplaint({...newComplaint, email_address: e.target.value})}
-                            placeholder="sender@example.com"
-                          />
-                        </div>
-                        <div>
-                          <Label>Complaint Source</Label>
-                          <Select value={newComplaint.complaint_source} onValueChange={(v) => setNewComplaint({...newComplaint, complaint_source: v})}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select provider" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Google">Google</SelectItem>
-                              <SelectItem value="Yahoo">Yahoo</SelectItem>
-                              <SelectItem value="Microsoft">Microsoft</SelectItem>
-                              <SelectItem value="Other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label>Complaint Type</Label>
-                          <Select value={newComplaint.complaint_type} onValueChange={(v) => setNewComplaint({...newComplaint, complaint_type: v})}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="spamhaus">Spamhaus</SelectItem>
-                              <SelectItem value="feedback_loop">Feedback Loop</SelectItem>
-                              <SelectItem value="manual">Manual</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label>IP Address (optional)</Label>
-                          <Input
-                            value={newComplaint.ip_address}
-                            onChange={(e) => setNewComplaint({...newComplaint, ip_address: e.target.value})}
-                            placeholder="192.168.1.1"
-                          />
-                        </div>
-                        <div>
-                          <Label>Details</Label>
-                          <Textarea
-                            value={newComplaint.complaint_details}
-                            onChange={(e) => setNewComplaint({...newComplaint, complaint_details: e.target.value})}
-                            placeholder="Details about the spam complaint..."
-                          />
-                        </div>
-                        <Button onClick={handleAddComplaint}>Add Complaint</Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+              <div className="border-2 border-red-500/50 bg-red-500/5 rounded-lg p-6 text-center space-y-3">
+                <div className="text-4xl">🔴</div>
+                <div>
+                  <div className="font-bold text-lg">Critical Domains</div>
+                  <div className="text-sm text-muted-foreground">Missing 2+ DNS records</div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex justify-center p-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : spamComplaints.length === 0 ? (
-                  <p className="text-center text-muted-foreground p-8">No spam complaints</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Email Address</TableHead>
-                        <TableHead>Provider</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>IP Address</TableHead>
-                        <TableHead>Details</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {spamComplaints.map((complaint) => {
-                        const complaintCount = complaintCounts[complaint.email_address] || 0;
-                        const isRepeatOffender = complaintCount >= 3;
-                        
-                        return (
-                          <TableRow 
-                            key={complaint.id} 
-                            className={
-                              !complaint.resolved 
-                                ? isRepeatOffender 
-                                  ? 'bg-red-500/10 border-l-4 border-red-500' 
-                                  : 'bg-orange-500/5'
-                                : ''
-                            }
-                          >
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono">{complaint.email_address}</span>
-                                {isRepeatOffender && (
-                                  <Badge variant="destructive" className="text-xs">
-                                    {complaintCount}x Repeat Offender
-                                  </Badge>
-                                )}
-                                {complaintCount >= 2 && complaintCount < 3 && (
-                                  <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-500">
-                                    {complaintCount}x
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                complaint.complaint_source === 'Google' ? 'bg-blue-500/20 text-blue-500' :
-                                complaint.complaint_source === 'Yahoo' ? 'bg-purple-500/20 text-purple-500' :
-                                complaint.complaint_source === 'Microsoft' ? 'bg-cyan-500/20 text-cyan-500' :
-                                'bg-gray-500/20 text-gray-500'
-                              }`}>
-                                {complaint.complaint_source || "—"}
-                              </span>
-                            </TableCell>
-                            <TableCell className="capitalize">{complaint.complaint_type}</TableCell>
-                            <TableCell className="font-mono text-xs">{complaint.ip_address || "—"}</TableCell>
-                            <TableCell className="max-w-xs truncate text-sm">{complaint.complaint_details || "—"}</TableCell>
-                            <TableCell>
-                              {complaint.resolved ? (
-                                <span className="px-2 py-1 rounded text-xs bg-green-500/20 text-green-500">
-                                  Resolved
-                                </span>
-                              ) : (
-                                <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-500">
-                                  Pending
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell>{new Date(complaint.created_at).toLocaleDateString()}</TableCell>
-                            <TableCell>
-                              {!complaint.resolved && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => handleResolveComplaint(complaint.id)}
-                                >
-                                  Resolve
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                <Button 
+                  onClick={() => downloadCSV('Critical Domains')} 
+                  variant="outline"
+                  className="w-full border-red-500/50 hover:bg-red-500/10"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download CSV
+                </Button>
+              </div>
+
+              <div className="border-2 border-red-500/50 bg-red-500/5 rounded-lg p-6 text-center space-y-3">
+                <div className="text-4xl">🛡️</div>
+                <div>
+                  <div className="font-bold text-lg">Blacklisted IPs</div>
+                  <div className="text-sm text-muted-foreground">IPs on RBL lists</div>
+                </div>
+                <Button 
+                  onClick={() => downloadCSV('Blacklisted IPs')} 
+                  variant="outline"
+                  className="w-full border-red-500/50 hover:bg-red-500/10"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download CSV
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </AdminLayout>
   );
 };
+
+// Helper components
+import { CheckCircle, XCircle } from "lucide-react";
 
 export default AdminServerMonitoring;
