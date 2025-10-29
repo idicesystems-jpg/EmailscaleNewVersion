@@ -2,6 +2,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database'); // adjust path if needed
 const User = require('./User');
+const { assign } = require('nodemailer/lib/shared');
 
 const Ticket = sequelize.define('Ticket', {
   id: {
@@ -41,6 +42,10 @@ const Ticket = sequelize.define('Ticket', {
   },
   feedback: {
     type: DataTypes.TEXT,
+    allowNull: true
+  },
+  assigned_to: {
+    type: DataTypes.INTEGER,
     allowNull: true
   },
   created_by: {
