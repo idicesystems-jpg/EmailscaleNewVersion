@@ -104,7 +104,7 @@ const {
   getActiveImpersonation,
 } = require("../controllers/impersonationController");
 
-const { createNote, getAllNotes, addNoteAdminReply } = require("../controllers/adminNoteController");
+const { createNote, getAllNotes, addNoteAdminReply, deleteNoteWithReplies, reassignNote } = require("../controllers/adminNoteController");
 
 
 // Routes
@@ -209,5 +209,7 @@ router.get('/impersonate/active/:adminId',getActiveImpersonation);
 router.post("/add-admin-notes", createNote);
 router.get("/get-admin-notes", getAllNotes);
 router.post('/admin-note-replies', addNoteAdminReply);
+router.delete('/delete-notes/:id', deleteNoteWithReplies);
+router.put('/reassign-note/:id', reassignNote);
 
 module.exports = router;
