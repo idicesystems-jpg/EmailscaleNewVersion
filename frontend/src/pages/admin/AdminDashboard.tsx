@@ -98,7 +98,7 @@ const AdminDashboard = () => {
   const [logSearch, setLogSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [adminNotes, setAdminNotes] = useState<any[]>([]);
+  //const [adminNotes, setAdminNotes] = useState<any[]>([]);
   const [newNote, setNewNote] = useState("");
   const [assignedTo, setAssignedTo] = useState<string>("");
   //const [adminUsers, setAdminUsers] = useState<any[]>([]);
@@ -107,7 +107,8 @@ const AdminDashboard = () => {
   const { toast } = useToast();
 
   const { data: notes } = useGetAdminNotesQuery();
-  console.log("notes", notes);
+  console.log("notes", notes?.data);
+  const adminNotes = notes?.data || [];
 
   const { data } = useGetAllTicketsQuery({
     page: 1,
@@ -898,12 +899,12 @@ const AdminDashboard = () => {
                               <span>•</span>
                               <span className="font-medium">
                                 By:{" "}
-                                {note.created_by_profile?.full_name ||
-                                  note.created_by_profile?.email ||
+                                {note.creator?.name ||
+                                  note.creator?.email ||
                                   "Unknown"}
                               </span>
                             </div>
-                            {note.assigned_profile && (
+                            {note.assignee && (
                               <div className="flex items-center gap-1">
                                 <span>•</span>
                                 <Badge
@@ -911,8 +912,8 @@ const AdminDashboard = () => {
                                   className="text-[10px] px-2 py-0"
                                 >
                                   <UserPlus className="h-2 w-2 mr-1" />
-                                  {note.assigned_profile.full_name ||
-                                    note.assigned_profile.email}
+                                  {note.assignee.name ||
+                                    note.assignee.email}
                                 </Badge>
                               </div>
                             )}
