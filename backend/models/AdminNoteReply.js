@@ -44,5 +44,10 @@ AdminNoteReply.belongsTo(User, {
   as: 'user'
 });
 
+AdminNote.hasMany(AdminNoteReply, {
+  foreignKey: 'note_id',
+  as: 'replies'
+});
+
 
 module.exports = AdminNoteReply;

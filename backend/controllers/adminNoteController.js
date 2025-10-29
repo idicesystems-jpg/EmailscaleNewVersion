@@ -47,6 +47,7 @@ const getAllNotes = async (req, res) => {
       include: [
         { model: User, as: 'creator', attributes: ['id', 'name', 'email'] },
         { model: User, as: 'assignee', attributes: ['id', 'name', 'email'] },
+        { model: AdminNoteReply, as: 'replies'}
       ],
       order: [['id', 'DESC']],
     });

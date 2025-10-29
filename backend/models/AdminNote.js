@@ -2,6 +2,8 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database'); // adjust path if needed
 const User = require('./User');
+// const AdminNoteReply = require('./AdminNoteReply');
+
 
 const AdminNote = sequelize.define('AdminNote', {
   id: {
@@ -53,5 +55,11 @@ AdminNote.belongsTo(User, {
   onUpdate: 'CASCADE',
 });
 
+// AdminNote.hasMany(AdminNoteReply, {
+//   foreignKey: 'note_id',
+//   as: 'replies',
+//   onDelete: 'CASCADE',
+//   onUpdate: 'CASCADE',
+// });
 
 module.exports = AdminNote;
