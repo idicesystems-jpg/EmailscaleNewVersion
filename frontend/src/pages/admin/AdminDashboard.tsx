@@ -12,9 +12,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import {
+  useCreateTicketMutation,
+  useGetAllTicketsQuery,
+  useLazyGetTicketDetailByIdQuery,
+  useReplyTicketMutation,
+  useLazyGetRepliesQuery,
+  useGetUserTicketsQuery,
+  useCloseTicketMutation,
+  useLazyGetAllNotesByTicketIdQuery,
+  useAddTicketNoteMutation,
+  useDeleteNoteMutation,
+  useRateTicketMutation,
+} from "@/services/ticketService";
+import { useSelector } from "react-redux";
 
 const AdminDashboard = () => {
   const { impersonatedUserId } = useImpersonation();
+  const { user, token, isAuthenticated } = useSelector((state: any) => state.auth);
+  
+  const isAdmin = user?.role_id == 1;
+
+
+
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -25,7 +45,7 @@ const AdminDashboard = () => {
     inboxPlacement: 0,
   });
   const [users, setUsers] = useState<any[]>([]);
-  const [tickets, setTickets] = useState<any[]>([]);
+  //const [tickets, setTickets] = useState<any[]>([]);
   const [serverStatus, setServerStatus] = useState<'healthy' | 'warning' | 'critical'>('healthy');
   const [expandedLogs, setExpandedLogs] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
@@ -39,6 +59,16 @@ const AdminDashboard = () => {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const { toast } = useToast();
+
+
+  const { data } = useGetAllTicketsQuery({
+     page:1,
+     limit:100,
+     status: "open",
+   });
+  console.log("data", data?.data);
+
+  const tickets = data?.data || [];
 
   useEffect(() => {
     fetchStats();
@@ -602,7 +632,7 @@ const AdminDashboard = () => {
                       <div>
                         <p className="text-sm text-foreground font-medium">{ticket.subject}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          #{ticket.ticket_number} - {ticket.profiles?.full_name || ticket.profiles?.email}
+                          #TICK-{ticket.id} - {ticket.user?.name || "-"}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

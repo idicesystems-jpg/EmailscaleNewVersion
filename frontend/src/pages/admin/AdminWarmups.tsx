@@ -62,8 +62,10 @@ import {
   useExportEmailAccountsCsvMutation,
   useDeleteEmailAccountsMutation
 } from "../../services/emailWarmupService";
+import { useImpersonation } from "@/hooks/useImpersonation";
 
 const AdminWarmups = () => {
+   const { impersonatedUserId } = useImpersonation();
   // Component for managing warmup accounts and pool
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -121,7 +123,7 @@ const AdminWarmups = () => {
     fetchUsers();
     fetchWarmupLogs();
     fetchInboxes();
-  }, []);
+  }, [impersonatedUserId]);
 
   const fetchUsers = async () => {
     const { data, error } = await supabase
@@ -426,6 +428,59 @@ const AdminWarmups = () => {
     }
   };
 
+  const handleDeleteAllWarmups = async () => {
+    const confirmation = prompt(
+      `⚠️ DANGER: This will permanently delete ALL ${warmups.length} user warmup accounts.\n\nType "DELETE ALL WARMUPS" to confirm:`
+    );
+    
+    if (confirmation !== "DELETE ALL WARMUPS") {
+      if (confirmation !== null) {
+        toast.error("Deletion cancelled - confirmation text did not match");
+      }
+      return;
+    }
+
+    const { error } = await supabase
+      .from('warmup_accounts')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+    if (error) {
+      toast.error("Error deleting all warmup accounts");
+      console.error(error);
+    } else {
+      toast.success(`All ${warmups.length} warmup accounts deleted successfully`);
+      fetchWarmups();
+    }
+  };
+
+  const handleDeleteAllPoolAccounts = async () => {
+    const confirmation = prompt(
+      `⚠️ DANGER: This will permanently delete ALL ${poolAccounts.length} warmup pool accounts.\n\nType "DELETE ALL POOL" to confirm:`
+    );
+    
+    if (confirmation !== "DELETE ALL POOL") {
+      if (confirmation !== null) {
+        toast.error("Deletion cancelled - confirmation text did not match");
+      }
+      return;
+    }
+
+    const { error } = await supabase
+      .from('warmup_pool')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+    if (error) {
+      toast.error("Error deleting all pool accounts");
+      console.error(error);
+    } else {
+      toast.success(`All ${poolAccounts.length} pool accounts deleted successfully`);
+      setSelectedRows([]);
+      fetchPoolAccounts();
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -438,7 +493,7 @@ const AdminWarmups = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="pool" className="space-y-6">
+        <Tabs defaultValue="users" className="space-y-6">
           <TabsList>
             <TabsTrigger
               value="pool"
@@ -522,6 +577,12 @@ const AdminWarmups = () => {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
+                     {poolAccounts.length > 0 && (
+                      <Button variant="destructive" size="sm" onClick={handleDeleteAllPoolAccounts}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete All Pool
+                      </Button>
+                    )}
                     {selectedRows.length > 0 && (
                       <Button
                         variant="destructive"
@@ -934,6 +995,13 @@ const AdminWarmups = () => {
                       total)
                     </CardDescription>
                   </div>
+                  <div className="flex gap-2">
+                  {paginatedWarmups?.length > 0 && (
+                        <Button variant="destructive" size="sm" onClick={handleDeleteAllWarmups}>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete All Warmups
+                        </Button>
+                      )}
                   {selectedWarmupRows.length > 0 && (
                     <Button
                       variant="destructive"
@@ -944,6 +1012,7 @@ const AdminWarmups = () => {
                       Delete Selected ({selectedWarmupRows.length})
                     </Button>
                   )}
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"

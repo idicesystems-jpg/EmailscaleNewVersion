@@ -12,6 +12,7 @@ import {
   LifeBuoy,
   Server,
   Settings,
+  Link as LinkIcon,
   UserCog
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,6 +91,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
     { path: "/admin/domains", icon: Globe, label: "Domains" },
     { path: "/admin/inboxes", icon: Mail, label: "Inboxes" },
     { path: "/admin/warmups", icon: Flame, label: "Warmup Accounts" },
+    { path: "/admin/integrations", icon: LinkIcon, label: "Integrations" },
     { path: "/admin/server-monitoring", icon: Server, label: "Server Monitoring" },
     { path: "/admin/support", icon: LifeBuoy, label: "Support Tickets" },
     { path: "/admin/settings", icon: Settings, label: "Settings" },
