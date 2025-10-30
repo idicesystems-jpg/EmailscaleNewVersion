@@ -824,6 +824,40 @@ const adminChangeUserPassword = async (req, res) => {
   }
 };
 
+const getUserCounters = async (req, res) => {
+  try {
+    
+    // const totalUsers = await User.count();
+
+    const totalUsers = await User.count({ where: { role_id: 2 } });
+
+    const activeUsers = await User.count({
+      where: { role_id: 2, status: 1 },
+    });
+
+    const inactiveClients = await User.count({
+      where: { role_id: 2, status: 0 },
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: "User counters fetched successfully",
+      data: {
+        // total_users: totalUsers,
+        total_users: totalUsers,
+        active_users: activeUsers,
+        inactive_users: inactiveClients,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user counters:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
 
 module.exports = {
   login,
@@ -840,5 +874,6 @@ module.exports = {
   changePassword,
   updateUserRole,
   getUserActivityLogs,
-  adminChangeUserPassword
+  adminChangeUserPassword,
+  getUserCounters
 };
