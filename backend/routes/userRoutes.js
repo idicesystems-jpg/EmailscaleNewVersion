@@ -19,7 +19,8 @@ const {
   updateUserProfile,
   changePassword,
   updateUserRole,
-  getUserActivityLogs
+  getUserActivityLogs,
+  adminChangeUserPassword
 } = require("../controllers/userController");
 const {
   getAllTransactions,
@@ -130,6 +131,7 @@ router.post("/update-user", updateUserProfile);
 router.post("/change-password", changePassword);
 router.put("/users/:id/role", updateUserRole);
 router.get("/user-activity", getUserActivityLogs);
+router.post('/admin/change-password', adminChangeUserPassword);
 
 router.get("/transaction", getAllTransactions);
 router.get("/transaction:id", getTransactionById);
