@@ -20,7 +20,8 @@ const {
   changePassword,
   updateUserRole,
   getUserActivityLogs,
-  adminChangeUserPassword
+  adminChangeUserPassword,
+  getUserCounters
 } = require("../controllers/userController");
 const {
   getAllTransactions,
@@ -132,6 +133,7 @@ router.post("/change-password", changePassword);
 router.put("/users/:id/role", updateUserRole);
 router.get("/user-activity", getUserActivityLogs);
 router.post('/admin/change-password', adminChangeUserPassword);
+router.get('/user-counters', getUserCounters);
 
 router.get("/transaction", getAllTransactions);
 router.get("/transaction:id", getTransactionById);
@@ -146,7 +148,7 @@ router.get("/all-domains", getDomainCreateData);
 router.post("/import-domains", upload.single("import_file"), importDomainsCsv);
 router.put("/domains/:id/status", updateDomainStatus);
 router.delete("/domains/:id", destroyDomain);
-router.get("/export-domains", exportDomainsCsv);
+router.get("/export-domains", exportDomainsCsv);  
 
 router.post(
   "/checkAlternateDomainAvailability",
