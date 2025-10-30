@@ -623,7 +623,6 @@ const changePassword = async (req, res) => {
       });
     }
 
-    
     const hashedPassword = await bcrypt.hash(new_password, 10);
     user.password = hashedPassword;
     await user.save();
@@ -778,6 +777,53 @@ const getUserActivityLogs = async (req, res) => {
   }
 };
 
+const adminChangeUserPassword = async (req, res) => {
+  try {
+    const { admin_id, user_id, new_password } = req.body;
+
+    // Validate input
+    if (!admin_id || !user_id || !new_password) {
+      return res.status(400).json({
+        status: false,
+        message: "Fields required: admin_id, user_id, new_password",
+      });
+    }
+
+
+    const admin = await User.findByPk(admin_id);
+    if (!admin || ![0, 1].includes(admin.role_id)) {
+      return res.status(403).json({
+        status: false,
+        message: "Only admins can change user passwords.",
+      });
+    }
+
+    const user = await User.findByPk(user_id);
+    if (!user) {
+      return res.status(404).json({
+        status: false,
+        message: "Target user not found",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(new_password, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    return res.status(200).json({
+      status: true,
+      message: `Password updated successfully for user ${user.email}`,
+    });
+  } catch (error) {
+    console.error("Error changing user password:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 
 module.exports = {
   login,
@@ -793,5 +839,6 @@ module.exports = {
   updateUserProfile,
   changePassword,
   updateUserRole,
-  getUserActivityLogs
+  getUserActivityLogs,
+  adminChangeUserPassword
 };
