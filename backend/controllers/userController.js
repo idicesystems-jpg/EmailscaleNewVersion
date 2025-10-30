@@ -9,6 +9,8 @@ const crypto = require("crypto");
 const { crteate_crm_user } = require("../helpers/crmHelper");
 const { Parser } = require("json2csv");
 const { Op } = require("sequelize");
+const logUserActivity = require("../utils/logUserActivity");
+const UserActivityLog = require("../models/UserActivityLog");
 
 const login = async (req, res) => {
   try {
@@ -84,6 +86,8 @@ const login = async (req, res) => {
         email: user.email,
       };
     }
+
+     await logUserActivity(req, user, 'Sign In');
 
     // 6. Return response
     return res.status(200).json({
@@ -677,6 +681,75 @@ const updateUserRole = async (req, res) => {
   }
 };
 
+// const logout = async (req, res) => {
+//   try {
+//     const user = req.user; // assuming you get user from auth middleware
+
+//     await logUserActivity(req, user, 'Sign Out');
+
+//     // Optionally, invalidate token
+//     user.emailscale_token = null;
+//     await user.save();
+
+//     return res.status(200).json({
+//       status: true,
+//       message: 'Logout successful!',
+//     });
+//   } catch (error) {
+//     console.error('Logout Error:', error);
+//     res.status(500).json({ status: false, message: 'Server Error' });
+//   }
+// };
+
+const getUserActivityLogs = async (req, res) => {
+  try {
+    const logs = await UserActivityLog.findAll({
+      include: [
+        {
+          model: User,
+           as: "user",
+          attributes: ["id", "name", "email"],
+          required: false, // In case user is deleted
+        },
+      ],
+      order: [["timestamp", "DESC"]],
+    });
+
+    // Group latest activity by user
+    const grouped = {};
+    logs.forEach((log) => {
+      if (!grouped[log.user_id]) {
+        grouped[log.user_id] = {
+          user_id: log.user_id,
+          email: log.email || log.User?.email,
+          name: log.User?.name || "Unknown",
+          last_activity: log.activity,
+          last_timestamp: log.timestamp,
+          browser: log.browser,
+          platform: log.platform,
+          timezone: log.timezone,
+          resolution: log.resolution,
+        };
+      }
+    });
+
+    const result = Object.values(grouped);
+
+    return res.status(200).json({
+      status: true,
+      message: "User activity logs fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Error fetching user activity logs:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
 
 module.exports = {
   login,
@@ -690,5 +763,6 @@ module.exports = {
   getUsersWithoutPagination,
   updateUserProfile,
   changePassword,
-  updateUserRole
+  updateUserRole,
+  getUserActivityLogs
 };

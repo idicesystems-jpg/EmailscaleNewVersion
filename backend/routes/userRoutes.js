@@ -7,6 +7,7 @@ const authenticateToken = require("../middlewares/authMiddleware");
 const impersonationMiddleware  = require("../middlewares/impersonationMiddleware");
 const {
   login,
+  logout,
   register,
   getUsers,
   updateUser,
@@ -18,6 +19,7 @@ const {
   updateUserProfile,
   changePassword,
   updateUserRole,
+  getUserActivityLogs
 } = require("../controllers/userController");
 const {
   getAllTransactions,
@@ -109,6 +111,7 @@ const { createNote, getAllNotes, addNoteAdminReply, deleteNoteWithReplies, reass
 
 // Routes
 router.post("/login", login);
+// router.post("/logout", logout);
 
 router.use(authenticateToken);
 router.use(impersonationMiddleware);
@@ -124,6 +127,7 @@ router.get("/export-csv", exportCsv);
 router.post("/update-user", updateUserProfile);
 router.post("/change-password", changePassword);
 router.put("/users/:id/role", updateUserRole);
+router.get("/user-activity", getUserActivityLogs);
 
 router.get("/transaction", getAllTransactions);
 router.get("/transaction:id", getTransactionById);
@@ -165,7 +169,7 @@ router.get("/getTicketDetailById/:id", getTicketDetailById);
 router.post("/reply", upload.single("file"), replyTicket);
 router.get("/replies/:id", getReplies);
 router.post("/tickets/assign", assignTicket);
-router.get('/admins', getAdminList);
+router.get('/admins', getAdminList); 
 
 // logged in user tickets.
 router.get("/user-tickets", getUserTickets);
