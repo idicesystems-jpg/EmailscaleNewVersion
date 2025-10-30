@@ -39,7 +39,7 @@ const Auth = () => {
             token: response.emailscale_token,
           })
         );
-       if (response.user.role_id == 1) {
+       if (response.user.role_id == 0 || response.user.role_id == 1 ) {
           navigate("/admin"); // admin dashboard
         } else {
           navigate("/dashboard"); // regular user dashboard

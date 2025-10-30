@@ -68,6 +68,8 @@ import {
   useGetAdminNotesQuery,
   useAddAdminNoteReplyMutation,
   useDeleteNoteWithRepliesMutation,
+  useReassignNoteMutation,
+  useDeleteNoteReplyMutation,
 } from "@/services/adminNoteService";
 
 import { useSelector } from "react-redux";
@@ -583,28 +585,66 @@ const AdminDashboard = () => {
     //fetchAdminNotes();
   };
 
-  const handleAssignNote = async (noteId: string, userId: string) => {
-    const { error } = await supabase
-      .from("admin_notes")
-      .update({ assigned_to: userId === "unassigned" ? null : userId })
-      .eq("id", noteId);
+  const [deleteNoteReply] = useDeleteNoteReplyMutation();
 
-    if (error) {
-      console.error("Error assigning note:", error);
-      toast({
-        title: "Error",
-        description: "Failed to assign note",
-        variant: "destructive",
-      });
+  const handleDeleteReplay = async (noteReplayId: string) => {
+    // const { error } = await supabase
+    //   .from("admin_notes")
+    //   .delete()
+    //   .eq("id", noteId);
+
+    // if (error) {
+    //   console.error("Error deleting note:", error);
+    //   toast({
+    //     title: "Error",
+    //     description: "Failed to delete note",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
+
+    if (!window.confirm("Are you sure you want to delete this note replay?"))
       return;
+    try {
+      await deleteNoteReply(noteReplayId);
+      toast({
+        title: "Success",
+        description: "Note Replay deleted successfully",
+      });
+    } catch (error) {
+      console.log("Failed to delete note Replay");
     }
+
+    //fetchAdminNotes();
+  };
+
+  const [reassignNote] = useReassignNoteMutation();
+  const handleAssignNote = async (noteId: string, userId: string) => {
+    await reassignNote({
+      id: noteId,
+      assigned_to: userId,
+    });
+    // const { error } = await supabase
+    //   .from("admin_notes")
+    //   .update({ assigned_to: userId === "unassigned" ? null : userId })
+    //   .eq("id", noteId);
+
+    // if (error) {
+    //   console.error("Error assigning note:", error);
+    //   toast({
+    //     title: "Error",
+    //     description: "Failed to assign note",
+    //     variant: "destructive",
+    //   });
+    //   return;
+    // }
 
     toast({
       title: "Success",
       description: "Note assignment updated",
     });
 
-    fetchAdminNotes();
+    //fetchAdminNotes();
   };
 
   return (
@@ -1036,7 +1076,7 @@ const AdminDashboard = () => {
                                   variant="ghost"
                                   size="sm"
                                   className="h-5 w-5 p-0 ml-auto hover:bg-destructive/20 hover:text-destructive"
-                                  onClick={() => handleDeleteNote(reply.id)}
+                                  onClick={() => handleDeleteReplay(reply.id)}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
