@@ -27,6 +27,7 @@ import { useDispatch } from "react-redux";
 import { logout } from "../services/authSlice";
 
 import { useAllUsersQuery } from "../services/adminUserService";
+import {useLogoutUserMutation} from "../services/authService";
 import { useSelector } from "react-redux";
 
 
@@ -75,8 +76,12 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
     
   };
 
+
+  const [logoutUser] = useLogoutUserMutation();
+
   const handleLogout = async () => {
     //await supabase.auth.signOut();
+    await logoutUser().unwrap();
     // Clear auth state
     dispatch(logout());
     navigate("/");

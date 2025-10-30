@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { NavLink } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { logout } from "../services/authSlice";
+import {useLogoutUserMutation} from "../services/authService";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -56,7 +57,9 @@ function AppSidebar() {
   const navigate = useNavigate();
   const { impersonatedUserEmail, clearImpersonation } = useImpersonation();
 
+  const [logoutUser] = useLogoutUserMutation();
   const handleLogout = async () => {
+    await logoutUser().unwrap();
     //await supabase.auth.signOut();
     // Clear auth state
     dispatch(logout());

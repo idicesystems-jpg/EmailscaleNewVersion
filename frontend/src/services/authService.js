@@ -66,6 +66,19 @@ export const authService = apiSlice.injectEndpoints({
         method: "GET",
       }),
     }),
+
+    logoutUser: builder.mutation({
+      query: () => {
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const resolution = `${window.screen.width}x${window.screen.height}`;
+
+        return {
+          url: "logout",
+          method: "POST",
+          body: { timezone, resolution },
+        };
+      },
+    }),
   }),
 
   overrideExisting: false,
@@ -79,5 +92,6 @@ export const {
   useChangePasswordMutation,
   useCheckOnboardingMutation,
   useCompleteOnboardingMutation,
-  useFetchUserActivityLogsQuery
+  useFetchUserActivityLogsQuery,
+  useLogoutUserMutation,
 } = authService;
