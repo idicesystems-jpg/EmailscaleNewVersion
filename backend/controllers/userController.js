@@ -749,7 +749,7 @@ const getUserActivityLogs = async (req, res) => {
         grouped[log.user_id] = {
           user_id: log.user_id,
           email: log.email || log.User?.email,
-          name: log.user.name,
+          name: log?.user?.name || "Unknown",
           last_activity: log.activity,
           last_timestamp: log.timestamp,
           browser: log.browser,
