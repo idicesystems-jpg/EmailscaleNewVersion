@@ -34,6 +34,25 @@ deleteNoteWithReplies: builder.mutation({
   invalidatesTags: ["AdminNotes"],
 }),
 
+reassignNote: builder.mutation({
+  query: ({ id, ...updateData }) => ({
+    url: `reassign-note/${id}`,
+    method: "PUT",
+    body: updateData,
+  }),
+  invalidatesTags: ["AdminNotes"],
+}),
+
+
+deleteNoteReply: builder.mutation({
+  query: (id) => ({
+    url: `delete-note-reply/${id}`,
+    method: "DELETE",
+  }),
+  invalidatesTags: ["AdminNotes"],
+}),
+
+
 
   }),
   overrideExisting: false,
@@ -43,5 +62,7 @@ export const {
   useAddAdminNoteMutation,
   useGetAdminNotesQuery,
   useAddAdminNoteReplyMutation,
-  useDeleteNoteWithRepliesMutation 
+  useDeleteNoteWithRepliesMutation,
+  useReassignNoteMutation ,
+  useDeleteNoteReplyMutation
 } = adminNoteService;
