@@ -681,25 +681,53 @@ const updateUserRole = async (req, res) => {
   }
 };
 
-// const logout = async (req, res) => {
-//   try {
-//     const user = req.user; // assuming you get user from auth middleware
+const logout0 = async (req, res) => {
+  try {
+    const user = req.user; // assuming you get user from auth middleware
 
-//     await logUserActivity(req, user, 'Sign Out');
+    await logUserActivity(req, user, 'Sign Out');
 
-//     // Optionally, invalidate token
-//     user.emailscale_token = null;
-//     await user.save();
+    // Optionally, invalidate token
+    user.emailscale_token = null;
+    await user.save();
 
-//     return res.status(200).json({
-//       status: true,
-//       message: 'Logout successful!',
-//     });
-//   } catch (error) {
-//     console.error('Logout Error:', error);
-//     res.status(500).json({ status: false, message: 'Server Error' });
-//   }
-// };
+    return res.status(200).json({
+      status: true,
+      message: 'Logout successful!',
+    });
+  } catch (error) {
+    console.error('Logout Error:', error);
+    res.status(500).json({ status: false, message: 'Server Error' });
+  }
+};
+
+const logout = async (req, res) => {
+  try {
+    const decodedUser = req.user; // this comes from JWT middleware
+
+    // Fetch full user from DB
+    const user = await User.findByPk(decodedUser.id);
+
+    if (!user) {
+      return res.status(404).json({ status: false, message: 'User not found' });
+    }
+
+    // Log activity
+    await logUserActivity(req, user, 'Sign Out');
+
+    // Clear token (optional)
+    user.emailscale_token = null;
+    await user.save();
+
+    return res.status(200).json({
+      status: true,
+      message: 'Logout successful!',
+    });
+  } catch (error) {
+    console.error('Logout Error:', error);
+    res.status(500).json({ status: false, message: 'Server Error' });
+  }
+};
 
 const getUserActivityLogs = async (req, res) => {
   try {
@@ -753,6 +781,7 @@ const getUserActivityLogs = async (req, res) => {
 
 module.exports = {
   login,
+  logout,
   register,
   getUsers,
   updateUser,

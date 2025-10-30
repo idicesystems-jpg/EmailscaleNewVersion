@@ -111,10 +111,12 @@ const { createNote, getAllNotes, addNoteAdminReply, deleteNoteWithReplies, reass
 
 // Routes
 router.post("/login", login);
-// router.post("/logout", logout);
+
 
 router.use(authenticateToken);
 router.use(impersonationMiddleware);
+
+router.post("/logout", logout);
 
 router.post("/register", authenticateToken, register);
 router.get("/users", getUsers);
