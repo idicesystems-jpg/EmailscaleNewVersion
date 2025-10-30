@@ -646,12 +646,12 @@ const updateUserRole = async (req, res) => {
     const userId = req.params.id;
     const { role_id } = req.body;
 
-    if (!role_id) {
-      return res.status(400).json({
-        success: false,
-        message: "role_id is required",
-      });
-    }
+    // if (!role_id) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "role_id is required",
+    //   });
+    // }
 
 
     const user = await User.findByPk(userId);

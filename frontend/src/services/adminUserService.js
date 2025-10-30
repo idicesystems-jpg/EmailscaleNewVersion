@@ -113,6 +113,15 @@ export const adminUserService = apiSlice.injectEndpoints({
       }),
     }),
 
+    updateUserRole: builder.mutation({
+      query: ({ id, role_id }) => ({
+        url: `users/${id}/role`,
+        method: "PUT",
+        body: { role_id },
+      }),
+      invalidatesTags: ["Users"], // optional: refresh user list if you have it
+    }),
+
     // Update subscription plan
     updateSubscription: builder.mutation({
       query: ({ userId, plan }) => ({
@@ -139,4 +148,5 @@ export const {
   useLazyExportUsersCsvQuery,
   useAllUsersQuery,
   useGetAdminListQuery,
+  useUpdateUserRoleMutation
 } = adminUserService;

@@ -71,6 +71,7 @@ import {
   useUpdateUserMutation,
   useUpdateUserStatusMutation,
   useLazyExportUsersCsvQuery,
+  useUpdateUserRoleMutation,
 } from "../../services/adminUserService";
 import Pagination from "../../components/Pagination";
 
@@ -88,8 +89,9 @@ const AdminUsers = () => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userRoles, setUserRoles] = useState<Record<string, string[]>>({});
   const [newPassword, setNewPassword] = useState("");
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
-
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const fetchUserRoles = async () => {
     const { data, error } = await supabase
@@ -286,11 +288,15 @@ const AdminUsers = () => {
 
       await updateUserStatus({
         userId,
-        status: newStatus, // 👈 backend expects 'status'
+        status: newStatus, //  backend expects 'status'
       }).unwrap();
 
+      // toast.success(
+      //   newStatus ? "User account locked successfully" : "User account resumed"
+      // );
+
       toast.success(
-        newStatus ? "User account paused successfully" : "User account resumed"
+        `Account ${!newStatus ? "locked" : "unlocked"} successfully`
       );
     } catch (error) {
       console.error("Error updating user status:", error);
@@ -414,34 +420,43 @@ const AdminUsers = () => {
     );
   });
 
-  const handleAssignRole = async (role: "super_admin" | "admin" | "user") => {
+  const [updateUserRole] = useUpdateUserRoleMutation();
+  const handleAssignRole = async (role) => {
     if (!selectedUser) return;
-
-    console.log("Assigning role:", role, "to user:", selectedUser.id);
-
-    const { data, error } = await supabase
-      .from("user_roles")
-      .insert({
-        user_id: selectedUser.id,
-        role: role,
-      })
-      .select();
-
-    console.log("Insert result:", { data, error });
-
-    if (error) {
-      if (error.code === "23505") {
-        toast.error("User already has this role");
-      } else {
-        toast.error(`Error assigning role: ${error.message}`);
-        console.error("Full error:", error);
-      }
-    } else {
-      toast.success(`Role ${role} assigned successfully`);
-      setRoleDialogOpen(false);
-      setSelectedUser(null);
-      fetchUserRoles();
+    try {
+      await updateUserRole({ id: selectedUser.id, role_id: role }).unwrap();
+      toast.success(`Role assigned successfully`);
+      setRoleDialogOpen(false)
+      //console.log("Role assigned successfully");
+    } catch (err) {
+      console.error("Failed to update role:", err);
     }
+
+    // console.log("Assigning role:", role, "to user:", selectedUser.id);
+
+    // const { data, error } = await supabase
+    //   .from("user_roles")
+    //   .insert({
+    //     user_id: selectedUser.id,
+    //     role: role,
+    //   })
+    //   .select();
+
+    // console.log("Insert result:", { data, error });
+
+    // if (error) {
+    //   if (error.code === "23505") {
+    //     toast.error("User already has this role");
+    //   } else {
+    //     toast.error(`Error assigning role: ${error.message}`);
+    //     console.error("Full error:", error);
+    //   }
+    // } else {
+    //   toast.success(`Role ${role} assigned successfully`);
+    //   setRoleDialogOpen(false);
+    //   setSelectedUser(null);
+    //   fetchUserRoles();
+    // }
   };
 
   const handleRemoveRole = async (userId: string, role: string) => {
@@ -503,7 +518,7 @@ const AdminUsers = () => {
     }
 
     setSelectedUserIds(new Set());
-    fetchUsers();
+    //fetchUsers();
   };
 
   const handleDeleteAllUsers = async () => {
@@ -541,10 +556,8 @@ const AdminUsers = () => {
       toast.error(`${errorCount} users failed to delete`);
     }
 
-    fetchUsers();
+    //fetchUsers();
   };
-
- 
 
   const handleToggleSelectUser = (userId: string) => {
     const newSelected = new Set(selectedUserIds);
@@ -588,7 +601,7 @@ const AdminUsers = () => {
                   setFormData({
                     email: "",
                     password: "",
-                    full_name: "",
+                    name: "",
                     phone: "",
                   });
                   setSelectedUser(null);
@@ -1016,20 +1029,23 @@ const AdminUsers = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedUserIds.size === filteredUsers.length && filteredUsers.length > 0}
-                        onCheckedChange={handleToggleSelectAll}
-                      />
-                    </TableHead>
+                        <Checkbox
+                          checked={
+                            selectedUserIds.size === filteredUsers.length &&
+                            filteredUsers.length > 0
+                          }
+                          onCheckedChange={handleToggleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead>Full Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Roles</TableHead>
-                    <TableHead>Subscription</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Stripe</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Roles</TableHead>
+                      <TableHead>Subscription</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Stripe</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1040,20 +1056,22 @@ const AdminUsers = () => {
                           user.account_locked ? "bg-destructive/5" : ""
                         }
                       >
-                         <TableCell className="w-12">
-                        <Checkbox
-                          checked={selectedUserIds.has(user.id)}
-                          onCheckedChange={() => handleToggleSelectUser(user.id)}
-                        />
-                      </TableCell>
+                        <TableCell className="w-12">
+                          <Checkbox
+                            checked={selectedUserIds.has(user.id)}
+                            onCheckedChange={() =>
+                              handleToggleSelectUser(user.id)
+                            }
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {user.name || "—"}
                         </TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>{user.phone || "—"}</TableCell>
-                         <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {userRoles[user.id]?.map((role) => (
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {/* {userRoles[user.id]?.map((role) => (
                             <span
                               key={role}
                               className="px-2 py-1 rounded text-xs bg-purple-500/20 text-purple-500 flex items-center gap-1 cursor-pointer hover:bg-purple-500/30"
@@ -1067,52 +1085,76 @@ const AdminUsers = () => {
                               <Shield className="h-3 w-3" />
                               {role}
                             </span>
-                          )) || "—"}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setRoleDialogOpen(true);
-                                }}
-                                className="h-6 px-2"
-                              >
-                                <Shield className="h-3 w-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Assign Admin Role</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TableCell>
-                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setSubscriptionDialogOpen(true);
-                          }}
-                          className="gap-2"
-                        >
-                          <CreditCard className="h-4 w-4" />
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            user.subscription_plan === 'unlimited' ? 'bg-purple-500/20 text-purple-500' :
-                            user.subscription_plan === 'professional' ? 'bg-blue-500/20 text-blue-500' :
-                            'bg-green-500/20 text-green-500'
-                          }`}>
-                            {user.subscription_plan === 'unlimited' ? 'Unlimited (£299)' :
-                             user.subscription_plan === 'professional' ? 'Professional (£99)' :
-                             'Starter (£69)'}
-                          </span>
-                        </Button>
-                        {user.account_paused && (
-                          <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-500 ml-2">
-                            Paused
-                          </span>
-                        )}
-                      </TableCell>
+                          )) || "—"} */}
+
+                            <span
+                              className="px-2 py-1 rounded text-xs bg-purple-500/20 text-purple-500 flex items-center gap-1 cursor-pointer hover:bg-purple-500/30"
+                              // onClick={() => {
+                              //   if (confirm(`Remove ${role} role from this user?`)) {
+                              //     handleRemoveRole(user.id, role);
+                              //   }
+                              // }}
+                              title="Click to remove this role"
+                            >
+                              <Shield className="h-3 w-3" />
+                              {user.role_id === 0
+                                ? "super_admin"
+                                : user.role_id === 1
+                                ? "admin"
+                                : "user"}
+                            </span>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setRoleDialogOpen(true);
+                                  }}
+                                  className="h-6 px-2"
+                                >
+                                  <Shield className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Assign Admin Role</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setSubscriptionDialogOpen(true);
+                            }}
+                            className="gap-2"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                            <span
+                              className={`px-2 py-1 rounded text-xs ${
+                                user.subscription_plan === "unlimited"
+                                  ? "bg-purple-500/20 text-purple-500"
+                                  : user.subscription_plan === "professional"
+                                  ? "bg-blue-500/20 text-blue-500"
+                                  : "bg-green-500/20 text-green-500"
+                              }`}
+                            >
+                              {user.subscription_plan === "unlimited"
+                                ? "Unlimited (£299)"
+                                : user.subscription_plan === "professional"
+                                ? "Professional (£99)"
+                                : "Starter (£69)"}
+                            </span>
+                          </Button>
+                          {user.account_paused && (
+                            <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-500 ml-2">
+                              Paused
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <span
                             className={`px-2 py-1 rounded text-xs ${
@@ -1155,19 +1197,21 @@ const AdminUsers = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                             <Tooltip>
+                            <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleViewAsUser(user.id, user.email)}
+                                  onClick={() =>
+                                    handleViewAsUser(user.id, user.email)
+                                  }
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>View as User</TooltipContent>
                             </Tooltip>
-                              <Tooltip>
+                            <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   variant="ghost"
@@ -1183,47 +1227,71 @@ const AdminUsers = () => {
                               </TooltipTrigger>
                               <TooltipContent>Edit User</TooltipContent>
                             </Tooltip>
-                             <Tooltip>
+                            <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleToggleLock(user.id, user.account_locked)}
+                                  // onClick={() =>
+                                  //   handleToggleLock(
+                                  //     user.id,
+                                  //     user.account_locked
+                                  //   )
+                                  // }
+
+                                   onClick={() =>
+                                    handleToggleUserStatusPause(
+                                      user.id,
+                                      user.status
+                                    )
+                                  }
                                 >
-                                  {user.account_locked ? (
+                                  {user.status ? (
                                     <Unlock className="h-4 w-4 text-green-500" />
                                   ) : (
                                     <Lock className="h-4 w-4" />
                                   )}
+                                  {/* {user.account_locked ? (
+                                    <Unlock className="h-4 w-4 text-green-500" />
+                                  ) : (
+                                    <Lock className="h-4 w-4" />
+                                  )} */}
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {user.account_locked ? "Unlock Account" : "Lock Account"}
+                                {user.account_locked
+                                  ? "Unlock Account"
+                                  : "Lock Account"}
                               </TooltipContent>
                             </Tooltip>
-                             <Tooltip>
+                            <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleTogglePause(user.id, user.account_paused)}
-                                   title={
-                                user.status == "1"
-                                  ? "Pause account"
-                                  : "Resume account"
-                              }
-                             >
-                                 
-
-                                   {user.status == "1" ? (
-                                <Pause className="h-4 w-4 text-red-500" />
-                              ) : (
-                                <Play className="h-4 w-4 text-green-500" />
-                              )}
+                                  onClick={() =>
+                                    handleTogglePause(
+                                      user.id,
+                                      user.account_paused
+                                    )
+                                  }
+                                  title={
+                                    user.status == "1"
+                                      ? "Pause account"
+                                      : "Resume account"
+                                  }
+                                >
+                                  {user.status == "1" ? (
+                                    <Pause className="h-4 w-4 text-red-500" />
+                                  ) : (
+                                    <Play className="h-4 w-4 text-green-500" />
+                                  )}
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {user.account_paused ? "Resume Account" : "Pause Account"}
+                                {user.account_paused
+                                  ? "Resume Account"
+                                  : "Pause Account"}
                               </TooltipContent>
                             </Tooltip>
                             <Tooltip>
@@ -1254,9 +1322,11 @@ const AdminUsers = () => {
                                   <CreditCard className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Manage Subscription</TooltipContent>
+                              <TooltipContent>
+                                Manage Subscription
+                              </TooltipContent>
                             </Tooltip>
-                             <Tooltip>
+                            <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   variant="ghost"
@@ -1286,13 +1356,14 @@ const AdminUsers = () => {
           </CardContent>
         </Card>
 
-         {/* Change Password Dialog */}
+        {/* Change Password Dialog */}
         <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Change User Password</DialogTitle>
               <DialogDescription>
-                Set a new password for {selectedUser?.full_name || selectedUser?.email}
+                Set a new password for{" "}
+                {selectedUser?.full_name || selectedUser?.email}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -1313,48 +1384,67 @@ const AdminUsers = () => {
           </DialogContent>
         </Dialog>
 
-         {/* Subscription Management Dialog */}
-        <Dialog open={subscriptionDialogOpen} onOpenChange={setSubscriptionDialogOpen}>
+        {/* Subscription Management Dialog */}
+        <Dialog
+          open={subscriptionDialogOpen}
+          onOpenChange={setSubscriptionDialogOpen}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Manage Subscription</DialogTitle>
               <DialogDescription>
-                Change subscription plan for {selectedUser?.full_name || selectedUser?.email}
+                Change subscription plan for{" "}
+                {selectedUser?.full_name || selectedUser?.email}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Current Plan: <span className="font-semibold">{selectedUser?.subscription_plan || 'starter'}</span></Label>
+                <Label>
+                  Current Plan:{" "}
+                  <span className="font-semibold">
+                    {selectedUser?.subscription_plan || "starter"}
+                  </span>
+                </Label>
               </div>
               <div className="grid gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleUpdateSubscription('starter')}
+                <Button
+                  variant="outline"
+                  onClick={() => handleUpdateSubscription("starter")}
                   className="justify-start h-auto py-4"
                 >
                   <div className="text-left">
                     <div className="font-semibold">Starter Plan - £69/mo</div>
-                    <div className="text-sm text-muted-foreground">30 inboxes</div>
+                    <div className="text-sm text-muted-foreground">
+                      30 inboxes
+                    </div>
                   </div>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleUpdateSubscription('professional')}
+                <Button
+                  variant="outline"
+                  onClick={() => handleUpdateSubscription("professional")}
                   className="justify-start h-auto py-4"
                 >
                   <div className="text-left">
-                    <div className="font-semibold">Professional Plan - £99/mo</div>
-                    <div className="text-sm text-muted-foreground">100 inboxes</div>
+                    <div className="font-semibold">
+                      Professional Plan - £99/mo
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      100 inboxes
+                    </div>
                   </div>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleUpdateSubscription('unlimited')}
+                <Button
+                  variant="outline"
+                  onClick={() => handleUpdateSubscription("unlimited")}
                   className="justify-start h-auto py-4"
                 >
                   <div className="text-left">
-                    <div className="font-semibold">Unlimited Plan - £299/mo</div>
-                    <div className="text-sm text-muted-foreground">Unlimited inboxes</div>
+                    <div className="font-semibold">
+                      Unlimited Plan - £299/mo
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Unlimited inboxes
+                    </div>
                   </div>
                 </Button>
               </div>
@@ -1374,36 +1464,52 @@ const AdminUsers = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 <Button
-                  onClick={() => handleAssignRole('super_admin')}
+                  onClick={() => handleAssignRole(0)}
                   variant="outline"
                   className="flex flex-col h-auto p-4"
                 >
                   <Shield className="h-6 w-6 mb-2 text-purple-500" />
                   <span className="font-semibold">Super Admin</span>
-                  <span className="text-xs text-muted-foreground">Full access</span>
+                  <span className="text-xs text-muted-foreground">
+                    Full access
+                  </span>
                 </Button>
                 <Button
-                  onClick={() => handleAssignRole('admin')}
+                  onClick={() => handleAssignRole(1)}
                   variant="outline"
                   className="flex flex-col h-auto p-4"
                 >
                   <Shield className="h-6 w-6 mb-2 text-blue-500" />
                   <span className="font-semibold">Admin</span>
-                  <span className="text-xs text-muted-foreground">Full access</span>
+                  <span className="text-xs text-muted-foreground">
+                    Full access
+                  </span>
                 </Button>
                 <Button
-                  onClick={() => handleAssignRole('user')}
+                  onClick={() => handleAssignRole(2)}
                   variant="outline"
                   className="flex flex-col h-auto p-4"
                 >
                   <Shield className="h-6 w-6 mb-2 text-gray-500" />
                   <span className="font-semibold">User</span>
-                  <span className="text-xs text-muted-foreground">Regular user</span>
+                  <span className="text-xs text-muted-foreground">
+                    Regular user
+                  </span>
                 </Button>
               </div>
               <div className="text-sm text-muted-foreground space-y-2">
-                <p><strong>Current roles:</strong> {userRoles[selectedUser?.id]?.join(', ') || 'None'}</p>
-                <p className="text-xs">Click on a role badge in the table to remove it.</p>
+                <p>
+                  <strong>Current roles:</strong>{" "}
+                  {/* {userRoles[selectedUser?.id]?.join(", ") || "None"} */}
+                  {selectedUser?.role_id === 0
+                    ? "Super Admin"
+                    : selectedUser?.role_id === 1
+                    ? "Admin"
+                    : "User"}
+                </p>
+                {/* <p className="text-xs">
+                  Click on a role badge in the table to remove it.
+                </p> */}
               </div>
             </div>
           </DialogContent>
