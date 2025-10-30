@@ -735,7 +735,7 @@ const getUserActivityLogs = async (req, res) => {
       include: [
         {
           model: User,
-           as: "user",
+          as: "user",
           attributes: ["id", "name", "email"],
           required: false, // In case user is deleted
         },
@@ -750,7 +750,7 @@ const getUserActivityLogs = async (req, res) => {
         grouped[log.user_id] = {
           user_id: log.user_id,
           email: log.email || log.User?.email,
-          name: log.User?.name || "Unknown",
+          name: log.user.name,
           last_activity: log.activity,
           last_timestamp: log.timestamp,
           browser: log.browser,
