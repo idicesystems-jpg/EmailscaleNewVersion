@@ -61,7 +61,8 @@ import {
   useDeleteNoteMutation,
   useRateTicketMutation,
 } from "@/services/ticketService";
-import { useGetAdminListQuery } from "@/services/adminUserService";
+import { useGetAdminListQuery ,useAllUsersQuery} from "@/services/adminUserService";
+import {useFetchUserActivityLogsQuery} from "@/services/authService";
 
 import {
   useAddAdminNoteMutation,
@@ -82,6 +83,10 @@ const AdminDashboard = () => {
 
   const isAdmin = user?.role_id == 0;
 
+
+  const { data:allusers } = useAllUsersQuery();
+  const allUsers = allusers?.users || [];
+
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -101,7 +106,7 @@ const AdminDashboard = () => {
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [logSearch, setLogSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
-  const [allUsers, setAllUsers] = useState<any[]>([]);
+  //const [allUsers, setAllUsers] = useState<any[]>([]);
   //const [adminNotes, setAdminNotes] = useState<any[]>([]);
   const [newNote, setNewNote] = useState("");
   const [assignedTo, setAssignedTo] = useState<string>("");
@@ -111,7 +116,7 @@ const AdminDashboard = () => {
   const { toast } = useToast();
 
   const { data: notes } = useGetAdminNotesQuery();
-  console.log("notes", notes?.data);
+  //console.log("notes", notes?.data);
   const adminNotes = notes?.data || [];
 
   const { data } = useGetAllTicketsQuery({
@@ -124,7 +129,12 @@ const AdminDashboard = () => {
 
   const { data: admins } = useGetAdminListQuery();
   const adminUsers = admins?.data || [];
-  console.log("admin", admins?.data);
+  //console.log("admin", admins?.data);
+
+
+  const { data: userActivity } = useFetchUserActivityLogsQuery();
+  console.log("userActivity", userActivity?.data);
+
 
   useEffect(() => {
     fetchStats();
@@ -322,7 +332,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const filteredLogs = activityLogs.filter((log) => {
+  const filteredLogs = userActivity?.data.filter((log) => {
     // Filter by selected user
     if (selectedUserId !== "all" && log.user_id !== selectedUserId) {
       return false;
@@ -331,9 +341,9 @@ const AdminDashboard = () => {
     // Filter by search text
     if (!logSearch) return true;
     const searchLower = logSearch.toLowerCase();
-    const email = log.profiles?.email?.toLowerCase() || "";
-    const name = log.profiles?.full_name?.toLowerCase() || "";
-    const timestamp = new Date(log.created_at).toLocaleString().toLowerCase();
+    const email = log?.email?.toLowerCase() || "";
+    const name = log?.name?.toLowerCase() || "";
+    const timestamp = new Date(log.last_timestamp).toLocaleString().toLowerCase();
     return (
       email.includes(searchLower) ||
       name.includes(searchLower) ||
@@ -341,12 +351,12 @@ const AdminDashboard = () => {
     );
   });
 
-  console.log("Activity logs state:", {
-    total: activityLogs.length,
-    filtered: filteredLogs.length,
-    selectedUserId,
-    logSearch,
-  });
+  // console.log("Activity logs state:", {
+  //   total: activityLogs.length,
+  //   filtered: filteredLogs.length,
+  //   selectedUserId,
+  //   logSearch,
+  // });
 
   const fetchAdminUsers = async () => {
     const { data, error } = await supabase
@@ -1124,18 +1134,18 @@ const AdminDashboard = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {users.length === 0 ? (
+            {userActivity?.data.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No user activity yet
               </p>
             ) : (
               <div className="space-y-3">
-                {users.slice(0, 5).map((user) => {
-                  const lastLogin = user.last_login
-                    ? new Date(user.last_login)
+                {userActivity?.data.slice(0, 5).map((user) => {
+                  const lastLogin = user.last_timestamp
+                    ? new Date(user.last_timestamp)
                     : null;
-                  const lastActive = user.last_active_at
-                    ? new Date(user.last_active_at)
+                  const lastActive = user.last_timestamp
+                    ? new Date(user.last_timestamp)
                     : null;
                   const isRecentlyActive =
                     lastActive &&
@@ -1156,7 +1166,7 @@ const AdminDashboard = () => {
                         />
                         <div>
                           <p className="text-sm font-medium text-foreground">
-                            {user.full_name || user.email}
+                            {user.name || user.email}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {user.email}
@@ -1210,7 +1220,7 @@ const AdminDashboard = () => {
                       <SelectItem value="all">All Users</SelectItem>
                       {allUsers.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
-                          {user.full_name || user.email}
+                          {user.name || user.email}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1258,37 +1268,37 @@ const AdminDashboard = () => {
                         filteredLogs.map((log) => (
                           <TableRow key={log.id}>
                             <TableCell className="font-medium">
-                              {log.profiles?.full_name || "Unknown"}
+                              {log?.name || "Unknown"}
                             </TableCell>
-                            <TableCell>{log.profiles?.email}</TableCell>
+                            <TableCell>{log?.email}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="capitalize">
-                                {log.activity_type.replace("_", " ")}
+                                {log.last_activity.replace("_", " ")}
                               </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Clock className="h-3 w-3 text-muted-foreground" />
                                 <span className="text-sm">
-                                  {new Date(log.created_at).toLocaleString()}
+                                  {new Date(log.last_timestamp).toLocaleString()}
                                 </span>
                               </div>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
                               <div className="space-y-1">
-                                <div>{log.metadata?.browser || "Unknown"}</div>
+                                <div>{log?.browser || "Unknown"}</div>
                                 <div className="text-[10px]">
-                                  {log.metadata?.platform || "Unknown"}
+                                  {log?.platform || "Unknown"}
                                 </div>
                               </div>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
                               <div className="space-y-1">
-                                {log.metadata?.timezone && (
-                                  <div>🌍 {log.metadata.timezone}</div>
+                                {log?.timezone && (
+                                  <div>🌍 {log?.timezone}</div>
                                 )}
-                                {log.metadata?.screen_resolution && (
-                                  <div>📺 {log.metadata.screen_resolution}</div>
+                                {log?.resolution && (
+                                  <div>📺 {log?.resolution}</div>
                                 )}
                               </div>
                             </TableCell>

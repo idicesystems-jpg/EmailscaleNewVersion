@@ -59,6 +59,13 @@ export const authService = apiSlice.injectEndpoints({
         body,
       }),
     }),
+
+    fetchUserActivityLogs: builder.query({
+      query: () => ({
+        url: "user-activity",
+        method: "GET",
+      }),
+    }),
   }),
 
   overrideExisting: false,
@@ -72,4 +79,5 @@ export const {
   useChangePasswordMutation,
   useCheckOnboardingMutation,
   useCompleteOnboardingMutation,
+  useFetchUserActivityLogsQuery
 } = authService;
