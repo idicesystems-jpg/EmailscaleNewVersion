@@ -12,7 +12,7 @@ import { setCredentials } from "../services/authSlice";
 
 const Auth = () => {
   const dispatch = useDispatch();
- 
+
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -28,10 +28,19 @@ const Auth = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const resolution = `${window.screen.width}x${window.screen.height}`;
+
+    const formDataWithMeta = {
+      ...formData,
+      timezone,
+      resolution,
+    };
     try {
-      const response = await loginUser(formData).unwrap();
+      const response = await loginUser(formDataWithMeta).unwrap();
+      //const response = await loginUser(formData).unwrap();
       console.log("Login Success:", response);
-       if (response.status) {
+      if (response.status) {
         // save token & user in redux
         dispatch(
           setCredentials({
@@ -39,13 +48,13 @@ const Auth = () => {
             token: response.emailscale_token,
           })
         );
-       if (response.user.role_id == 0 || response.user.role_id == 1 ) {
+        if (response.user.role_id == 0 || response.user.role_id == 1) {
           navigate("/admin"); // admin dashboard
         } else {
           navigate("/dashboard"); // regular user dashboard
         } // redirect after login
       }
-       // optional
+      // optional
     } catch (err) {
       console.error("Login Failed:", err);
     }

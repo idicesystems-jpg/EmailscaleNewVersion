@@ -3,8 +3,7 @@ const UserActivityLog = require('../models/UserActivityLog');
 const logUserActivity = async (req, user, activity) => {
   try {
     const userAgent = req.headers['user-agent'] || 'Unknown';
-    const timezone = req.headers['x-timezone'] || 'Unknown';
-    const resolution = req.headers['x-resolution'] || 'Unknown';
+    const {timezone,resolution}= req.body;
 
     await UserActivityLog.create({
       user_id: user.id,
