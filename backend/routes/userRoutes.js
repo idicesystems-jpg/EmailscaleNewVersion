@@ -65,6 +65,7 @@ const {
   assignTicket,
   getUserTickets,
   getAdminList,
+  getTicketStatsCounter,
   closeTicket,
   rateTicket,
   deleteTicket,
@@ -89,6 +90,8 @@ const {
   deleteCampaigns,
   deleteCampaign,
   updateLimits,
+  run_campaign,
+  run_campaign_by_cron
 } = require("../controllers/emailCampaignController");
 
 const {
@@ -176,6 +179,7 @@ router.post("/reply", upload.single("file"), replyTicket);
 router.get("/replies/:id", getReplies);
 router.post("/tickets/assign", assignTicket);
 router.get('/admins', getAdminList); 
+router.get('/ticket-stats-counter', getTicketStatsCounter); 
 
 // logged in user tickets.
 router.get("/user-tickets", getUserTickets);
@@ -200,6 +204,8 @@ router.put("/update-campaign", updateCampaignDetails);
 router.post("/delete_campaigns", deleteCampaigns);
 router.post("/delete_campaign", deleteCampaign);
 router.post("/update-limits", updateLimits);
+router.post("/run_campaign", run_campaign);
+router.all('/run_campaign_by_cron',run_campaign_by_cron);
 
 router.get("/smtps", getAllSmtps);
 router.post("/smtps", createSmtp);
