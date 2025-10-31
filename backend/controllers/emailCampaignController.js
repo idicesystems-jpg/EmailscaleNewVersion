@@ -3,12 +3,17 @@ const User = require("../models/User");
 const Campaign = require("../models/Campaign");
 const EmailCampaign = require("../models/EmailCampaign");
 const EmailCampaignStatus = require("../models/EmailCampaignStatus");
+const AiReplyMessage = require("../models/AiReplyMessage");
 const { Op, fn, col, literal } = require("sequelize");
+const { Sequelize } = require("sequelize");
 const fs = require("fs");
+const path = require('path');
+const moment = require('moment');
 const dayjs = require("dayjs");
 const imaps = require("imap-simple");
 const multer = require("multer");
 const { parse } = require("csv-parse");
+const { send_mail, send_mail1 } = require('../helpers/mailHelpers');
 
 const getAllEmailCampaigns = async (req, res) => {
   try {
@@ -919,6 +924,250 @@ const updateLimits = async (req, res) => {
   }
 };
 
+const run_campaign = async (req, res) => {
+  try {
+    // Step 1: Get today's campaign IDs from EmailCampaignStatus
+    const today = moment().format('YYYY-MM-DD');
+    const todayRunIds = await EmailCampaignStatus.findAll({
+      attributes: ['campaign_id'],
+      where: Sequelize.where(
+        Sequelize.fn('DATE', Sequelize.col('created_at')),
+        today
+      ),
+    });
+
+    let ids = todayRunIds.map(item => item.campaign_id);
+
+    // Step 2: Log file path
+    const file = path.join(__dirname, '../public/ids_logs/ids.log');
+    const dir = path.dirname(file);
+
+    // Ensure directory exists
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    // Step 3: Write log data
+    const logStream = fs.createWriteStream(file, { flags: 'a' });
+    logStream.write(`\n============== ${Date.now()} ===============\n`);
+    logStream.write(JSON.stringify(ids) + '\n');
+
+    // Step 4: Fetch campaigns not in today's IDs
+    const campaigns = await Campaign.findAll({
+      where: {
+        warmup_enabled: 'TRUE',
+        id: { [Op.notIn]: ids.length ? ids : [0] },
+      },
+      order: Sequelize.literal('RAND()'),
+      limit: 50,
+    });
+
+    // Step 5: Process each campaign
+    for (const campaign of campaigns) {
+      const campaign_id = campaign.id;
+      const user_id = campaign.user_id;
+      const limit = campaign.daily_limit;
+      const warmup_limit = campaign.warmup_limit;
+
+      const eCampaigns = await EmailCampaign.findAll({
+        order: Sequelize.literal('RAND()'),
+        limit: limit,
+      });
+
+      if (eCampaigns.length > 0) {
+        const senders = eCampaigns.map(e => e.id);
+
+        const data = {
+          campaign_id: campaign_id,
+          is_spam: 0,
+          is_send: 0,
+          is_send1: 0,
+          user_id: 1,
+          senders: JSON.stringify(senders),
+        };
+
+        logStream.write(`======create======== ${Date.now()} ===============\n`);
+        logStream.write(JSON.stringify(data) + '\n');
+
+        await EmailCampaignStatus.create(data);
+      }
+    }
+
+    logStream.end();
+
+    return res.json({ status: true, msg: 'Campaign run successfully' });
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ status: false, msg: 'Server Error', error: error.message });
+  }
+};
+
+
+
+const  run_campaign_by_cron = async (req, res) => {
+  try {
+    // For testing — matches Laravel’s early return and die()
+    // Comment this out if you want actual execution
+    // return res.json({ status: true, msg: 'Campaign run successfully' });
+    
+
+    // Step 1: Fetch today's EmailCampaignStatus records
+    const today = moment().format('YYYY-MM-DD');
+    const todayUpdatedCampaigns = await EmailCampaignStatus.findAll({
+      where: {
+        [Op.and]: [
+          Sequelize.where(Sequelize.fn('DATE', Sequelize.col('created_at')), today),
+          { is_run: 0 },
+          { senders: { [Op.ne]: null } }
+        ]
+      },
+      order: Sequelize.literal('RAND()'),
+      limit: 50
+    });
+
+    // Step 2: Prepare log file path
+    const file = path.join(__dirname, '../public/run_campaign_by_cron_logs/run_campaign_by_cron.log');
+    const dir = path.dirname(file);
+
+    // Ensure directory exists
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    const logStream = fs.createWriteStream(file, { flags: 'a' });
+    logStream.write(`======create======== ${Date.now()} ===============\n`);
+
+    // Step 3: Loop through campaigns
+    for (const todayUpdatedCampaign of todayUpdatedCampaigns) {
+      const ecsid = todayUpdatedCampaign.ecsid;
+      const campaign_id = todayUpdatedCampaign.campaign_id;
+      const t_spam = todayUpdatedCampaign.is_spam;
+      let is_send = todayUpdatedCampaign.is_send;
+      let is_send1 = todayUpdatedCampaign.is_send1;
+
+      let senders = [];
+      let reply_sender = [];
+      let spam_data = [];
+
+      try {
+        senders = JSON.parse(todayUpdatedCampaign.senders || '[]');
+        reply_sender = JSON.parse(todayUpdatedCampaign.reply_sender || '[]');
+        spam_data = JSON.parse(todayUpdatedCampaign.spam_data || '[]');
+      } catch (err) {
+        senders = [];
+        reply_sender = [];
+        spam_data = [];
+      }
+
+      if (senders && senders.length > 0) {
+        const campaign1 = await Campaign.findOne({
+          where: { id: campaign_id, warmup_enabled: 'TRUE' }
+        });
+
+        if (campaign1) {
+          const smtp_username = campaign1.smtp_username;
+          const smtp_password = campaign1.smtp_password;
+          const smtp_host = campaign1.smtp_host;
+          const smtp_port = campaign1.smtp_port;
+          const message_type = campaign1.message_type;
+
+          const id = senders.shift();
+          const campaign = await EmailCampaign.findOne({ where: { id } });
+
+          const imap_username = `${campaign.first_name} ${campaign.last_name}`;
+          const to = campaign.imap_username;
+
+          // Fetch random message from AiReplyMessage
+          const emailTemplate = await AiReplyMessage.findOne({
+            order: Sequelize.literal('RAND()')
+          });
+
+          const subject1 = emailTemplate ? emailTemplate.subject : 'No Subject';
+          const message1 = emailTemplate ? emailTemplate.message : 'No Message';
+
+          if (campaign1.email_provider === 'G-Suite') {
+            const args1 = {
+              bodyMessage: message1,
+              to_name: imap_username,
+              to: to,
+              subject: subject1,
+              from_name: 'Automation Tool',
+              from_email: smtp_username,
+              smtp_username,
+              smtp_password,
+              smtp_host,
+              smtp_port,
+              refresh_token: campaign1.refresh_token,
+              id: campaign1.id
+            };
+            await send_mail1(args1);
+          } else {
+            const args1 = {
+              bodyMessage: message1,
+              to_name: imap_username,
+              to: to,
+              subject: subject1,
+              from_name: 'Automation Tool',
+              from_email: smtp_username,
+              smtp_username,
+              smtp_password,
+              smtp_host,
+              smtp_port
+            };
+            await send_mail(args1);
+          }
+
+          // Save message record
+          const sdata = {
+            campaign_id: campaign_id,
+            sender_id: id,
+            message: message1
+          };
+          await SenderMessage.create(sdata);
+
+          is_send1 = is_send1 + 1;
+          reply_sender.push(id);
+
+          const updateData = {
+            senders: JSON.stringify(senders),
+            reply_sender: JSON.stringify(reply_sender)
+          };
+
+          logStream.write(`${campaign_id}\n`);
+          logStream.write(JSON.stringify(updateData) + '\n');
+
+          await EmailCampaignStatus.update(updateData, {
+            where: { ecsid }
+          });
+        }
+      } else {
+        const updateData = {
+          is_run: 1,
+          senders: null
+        };
+
+        logStream.write(JSON.stringify(updateData) + '\n');
+
+        await EmailCampaignStatus.update(updateData, {
+          where: { ecsid }
+        });
+      }
+    }
+
+    logStream.end();
+    return res.json({ status: true, msg: 'Campaign run successfully' });
+  } catch (error) {
+    console.error('Error in run_campaign_by_cron:', error);
+    return res.status(500).json({
+      status: false,
+      msg: 'Server Error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllEmailCampaigns,
   getEmailCampaigns,
@@ -928,4 +1177,6 @@ module.exports = {
   deleteCampaigns,
   deleteCampaign,
   updateLimits,
+  run_campaign,
+  run_campaign_by_cron
 };

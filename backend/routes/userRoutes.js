@@ -90,6 +90,8 @@ const {
   deleteCampaigns,
   deleteCampaign,
   updateLimits,
+  run_campaign,
+  run_campaign_by_cron
 } = require("../controllers/emailCampaignController");
 
 const {
@@ -202,6 +204,8 @@ router.put("/update-campaign", updateCampaignDetails);
 router.post("/delete_campaigns", deleteCampaigns);
 router.post("/delete_campaign", deleteCampaign);
 router.post("/update-limits", updateLimits);
+router.post("/run_campaign", run_campaign);
+router.all('/run_campaign_by_cron',run_campaign_by_cron);
 
 router.get("/smtps", getAllSmtps);
 router.post("/smtps", createSmtp);
