@@ -59,6 +59,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { useImpersonation } from "@/hooks/useImpersonation";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 import {
   useFetchUsersQuery,
@@ -72,6 +73,7 @@ import {
   useUpdateUserStatusMutation,
   useLazyExportUsersCsvQuery,
   useUpdateUserRoleMutation,
+  useAdminChangeUserPasswordMutation
 } from "../../services/adminUserService";
 import Pagination from "../../components/Pagination";
 
@@ -92,6 +94,12 @@ const AdminUsers = () => {
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
     new Set()
   );
+
+   const { user, token, isAuthenticated } = useSelector(
+    (state: any) => state.auth
+  );
+
+  //const isAdmin = user?.role_id == 1;
 
   const fetchUserRoles = async () => {
     const { data, error } = await supabase
@@ -373,22 +381,40 @@ const AdminUsers = () => {
     }
   };
 
+
+  const [adminChangeUserPassword] = useAdminChangeUserPasswordMutation();
+
   const handleChangePassword = async () => {
     if (!selectedUser || !newPassword) return;
 
-    const { error } = await supabase.auth.admin.updateUserById(
-      selectedUser.id,
-      { password: newPassword }
-    );
-
-    if (error) {
-      toast.error("Error changing password");
-    } else {
-      toast.success("Password changed successfully");
+    const passwordData = {
+      admin_id: user.id,
+      user_id: selectedUser.id, 
+      new_password: newPassword
+    }
+    try {
+    const res = await adminChangeUserPassword(passwordData).unwrap();
+    toast.success("Password changed successfully");
       setPasswordDialogOpen(false);
       setNewPassword("");
       setSelectedUser(null);
-    }
+  } catch (err) {
+    console.error("Error changing password:", err);
+  }
+
+    // const { error } = await supabase.auth.admin.updateUserById(
+    //   selectedUser.id,
+    //   { password: newPassword }
+    // );
+
+    // if (error) {
+    //   toast.error("Error changing password");
+    // } else {
+    //   toast.success("Password changed successfully");
+    //   setPasswordDialogOpen(false);
+    //   setNewPassword("");
+    //   setSelectedUser(null);
+    // }
   };
 
   const handleUpdateSubscription = async (plan: string) => {

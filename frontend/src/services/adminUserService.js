@@ -113,6 +113,15 @@ export const adminUserService = apiSlice.injectEndpoints({
       }),
     }),
 
+    adminChangeUserPassword: builder.mutation({
+      query: (passwordData) => ({
+        url: "admin/change-password",
+        method: "POST",
+        body: passwordData,
+      }),
+      invalidatesTags: ["Users"],
+    }),
+
     updateUserRole: builder.mutation({
       query: ({ id, role_id }) => ({
         url: `users/${id}/role`,
@@ -148,5 +157,6 @@ export const {
   useLazyExportUsersCsvQuery,
   useAllUsersQuery,
   useGetAdminListQuery,
-  useUpdateUserRoleMutation
+  useUpdateUserRoleMutation,
+  useAdminChangeUserPasswordMutation,
 } = adminUserService;

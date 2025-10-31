@@ -39,7 +39,7 @@ const Auth = () => {
     try {
       const response = await loginUser(formDataWithMeta).unwrap();
       //const response = await loginUser(formData).unwrap();
-      console.log("Login Success:", response);
+      //console.log("Login Success:", response);
       if (response.status) {
         // save token & user in redux
         dispatch(
@@ -53,9 +53,19 @@ const Auth = () => {
         } else {
           navigate("/dashboard"); // regular user dashboard
         } // redirect after login
+      } else {
+        toast({
+          title: "Login Failed",
+          description: response.message,
+        });
       }
       // optional
     } catch (err) {
+      toast({
+        title: "Login Failed:",
+        description: err.data.message,
+        variant: "destructive",
+      }); 
       console.error("Login Failed:", err);
     }
   };
