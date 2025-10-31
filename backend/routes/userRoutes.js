@@ -65,6 +65,7 @@ const {
   assignTicket,
   getUserTickets,
   getAdminList,
+  getTicketStatsCounter,
   closeTicket,
   rateTicket,
   deleteTicket,
@@ -176,6 +177,7 @@ router.post("/reply", upload.single("file"), replyTicket);
 router.get("/replies/:id", getReplies);
 router.post("/tickets/assign", assignTicket);
 router.get('/admins', getAdminList); 
+router.get('/ticket-stats-counter', getTicketStatsCounter); 
 
 // logged in user tickets.
 router.get("/user-tickets", getUserTickets);

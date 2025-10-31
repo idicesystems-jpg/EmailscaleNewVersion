@@ -240,6 +240,12 @@ async function removeTicketFromGHL(userEmail, ticketId) {
 }
 
 const createTicket = async (req, res) => {
+
+  const isImpersonating = !!req.impersonatedUser; 
+  const impersonatedUserId = req.impersonatedUser?.id;
+  const impersonatedEmail = req.impersonatedUser?.email;
+
+  console.log("Impersonation Status:", { isImpersonating, impersonatedUserId, impersonatedEmail });
   try {
     const { subject, message, priority, user_id } = req.body;
     const createdBy = req.user.id;
@@ -1059,6 +1065,54 @@ const getAdminList = async (req, res) => {
   }
 }
 
+const getTicketStatsCounter = async (req, res) => {
+  try {
+    // Current date
+    const now = new Date();
+
+    // Calculate date ranges
+    const last24Hours = new Date(now);
+    last24Hours.setDate(now.getDate() - 1);
+
+    const last7Days = new Date(now);
+    last7Days.setDate(now.getDate() - 7);
+
+    const last30Days = new Date(now);
+    last30Days.setDate(now.getDate() - 30);
+
+    // Queries
+    const last24hCount = await Ticket.count({
+      where: { created_at: { [Op.gte]: last24Hours } },
+    });
+
+    const last7DaysCount = await Ticket.count({
+      where: { created_at: { [Op.gte]: last7Days } },
+    });
+
+    const last30DaysCount = await Ticket.count({
+      where: { created_at: { [Op.gte]: last30Days } },
+    });
+
+    // Response
+    return res.status(200).json({
+      status: true,
+      message: "Ticket statistics fetched successfully",
+      data: {
+        last_24_hours: last24hCount,
+        last_7_days: last7DaysCount,
+        last_30_days: last30DaysCount,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching ticket stats:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Error fetching ticket statistics",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createTicket,
   getAllTickets,
@@ -1073,5 +1127,6 @@ module.exports = {
   getNotificationsByEmail,
   markNotificationsRead,
   assignTicket,
-  getAdminList
+  getAdminList,
+  getTicketStatsCounter
 };
