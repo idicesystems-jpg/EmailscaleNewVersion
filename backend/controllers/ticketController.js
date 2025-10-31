@@ -240,11 +240,31 @@ async function removeTicketFromGHL(userEmail, ticketId) {
 }
 
 const createTicket = async (req, res) => {
+  //check impersonation first
+  const isImpersonating = !!req.impersonatedUser;
+
+  const impersonatedUserId = req.impersonatedUser?.id;
+  const impersonatedEmail = req.impersonatedUser?.email;
+
   try {
     const { subject, message, priority, user_id } = req.body;
     const createdBy = req.user.id;
     const file = req.file ? req.file.filename : null;
-    const userId = req.user.role_id === 1 && user_id ? user_id : req.user.id;
+    //const userId = req.user.role_id === 1 && user_id ? user_id : req.user.id;
+    let userId;
+
+    // If impersonation is active, use impersonated user ID
+    if (req.impersonatedUser) {
+      userId = req.impersonatedUser.id;
+    }
+    // If logged-in user is an admin and provided user_id exists, use that
+    else if (req.user.role_id === 1 || req.user.role_id === 0  && req.body?.user_id) {
+      userId = req.body.user_id;
+    }
+    // Otherwise, use the logged-in user’s own ID
+    else {
+      userId = req.user.id;
+    }
 
     //  Create ticket record
     const newTicket = await Ticket.create({
@@ -356,7 +376,6 @@ const createTicket = async (req, res) => {
     await transporter.sendMail({
       from: `"Ticket System" <${process.env.SMTP_USER}>`,
       to: process.env.SMTP_USER,
-      bcc: "nikhil02.1998@gmail.com",
       subject: `New Ticket #${ticketId}: ${subject}`,
       html: emailTemplate("New Ticket Submitted", adminContent, bottomHtml),
     });
@@ -365,7 +384,6 @@ const createTicket = async (req, res) => {
     await transporter.sendMail({
       from: `"Ticket System" <${process.env.SMTP_USER}>`,
       to: userEmail,
-      bcc: "umasharma0821@gmail.com",
       subject: `Ticket Received: #${ticketId}`,
       html: emailTemplate("Ticket Confirmation", userContent, bottomHtml),
     });
@@ -560,7 +578,6 @@ const replyTicket = async (req, res) => {
     await transporter.sendMail({
       from: `"${sender.name}" <${sender.email}>`,
       to: recipient.email,
-      bcc: "nikhil02.1998@gmail.com",
       subject: `Reply to Ticket #${ticket_id}`,
       html: emailTemplate("New Reply", replyContent),
     });
@@ -656,7 +673,29 @@ const getReplies = async (req, res) => {
 };
 
 const getUserTickets = async (req, res) => {
-  const userId = req.user.id;
+   //check impersonation first
+  const isImpersonating = !!req.impersonatedUser;
+
+  const impersonatedUserId = req.impersonatedUser?.id;
+  const impersonatedEmail = req.impersonatedUser?.email;
+  
+   //const userId = req.user.role_id === 1 && user_id ? user_id : req.user.id;
+    let userId;
+
+    // If impersonation is active, use impersonated user ID
+    if (req.impersonatedUser) {
+      userId = req.impersonatedUser.id;
+    }
+    // If logged-in user is an admin and provided user_id exists, use that
+    else if (req.user.role_id === 1 || req.user.role_id === 0  && req.body?.user_id) {
+      userId = req.body.user_id;
+    }
+    // Otherwise, use the logged-in user’s own ID
+    else {
+      userId = req.user.id;
+    }
+
+  //const userId = req.user.id;
   const { status, priority, page = 1, limit = 10 } = req.query;
 
   try {
@@ -733,7 +772,6 @@ const closeTicket = async (req, res) => {
     const mailOptions = {
       from: `"Ticket System" <${process.env.SMTP_USER}>`,
       subject: `Ticket Closed: #${ticketId}`,
-      bcc: "nikhil02.1998@gmail.com",
     };
 
     if (userEmail) {
@@ -884,7 +922,6 @@ const deleteTicket = async (req, res) => {
     const mailOptions = {
       from: `"Ticket System" <${process.env.SMTP_USER}>`,
       subject: `Ticket Deleted: #${ticketId}`,
-      bcc: "nikhil02.1998@gmail.com",
     };
 
     // Send email to user
@@ -995,11 +1032,15 @@ const assignTicket = async (req, res) => {
 
     // Only Super Admin (role_id = 0) can assign
     if (roleId !== 0) {
-      return res.status(403).json({ message: "Only super admin can assign tickets" });
+      return res
+        .status(403)
+        .json({ message: "Only super admin can assign tickets" });
     }
 
     if (!ticket_id || !assigned_to) {
-      return res.status(400).json({ message: "ticket_id and assigned_to are required" });
+      return res
+        .status(400)
+        .json({ message: "ticket_id and assigned_to are required" });
     }
 
     // Find the ticket
@@ -1014,7 +1055,9 @@ const assignTicket = async (req, res) => {
     });
 
     if (!adminUser) {
-      return res.status(400).json({ message: "Assigned user must be an admin" });
+      return res
+        .status(400)
+        .json({ message: "Assigned user must be an admin" });
     }
 
     // Update assignment
@@ -1032,32 +1075,31 @@ const assignTicket = async (req, res) => {
 };
 
 const getAdminList = async (req, res) => {
-  try{
+  try {
     const admins = await User.findAll({
-      where:{role_id:1},
-      attributes: ['id', 'name', 'email']
-    })
+      where: { role_id: 1 },
+      attributes: ["id", "name", "email"],
+    });
 
-    if(!admins.length){
+    if (!admins.length) {
       return res.status(404).json({
-        message:"No Admins Found",
-        data:[]
-      })
+        message: "No Admins Found",
+        data: [],
+      });
     }
     return res.status(200).json({
-      status:true,
+      status: true,
       message: "Admins fetched successfully",
-      data: admins
-    })
-  }catch(err){
-   return res.status(500).json({
-    status: false,
-    message:"internal Server Error",
-    error: err.message
-   });
-    
+      data: admins,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      status: false,
+      message: "internal Server Error",
+      error: err.message,
+    });
   }
-}
+};
 
 module.exports = {
   createTicket,
@@ -1073,5 +1115,5 @@ module.exports = {
   getNotificationsByEmail,
   markNotificationsRead,
   assignTicket,
-  getAdminList
+  getAdminList,
 };
