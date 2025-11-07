@@ -23,7 +23,7 @@ export const emailWarmupService = apiSlice.injectEndpoints({
       invalidatesTags: ["EmailWarmup"],
     }),
 
-     deleteEmailAccounts: builder.mutation({
+    deleteEmailAccounts: builder.mutation({
       query: (id) => ({
         url: `delete-email-accounts/${id}`,
         method: "DELETE",
@@ -50,8 +50,7 @@ export const emailWarmupService = apiSlice.injectEndpoints({
       }),
     }),
 
-
-     exportEmailAccountsCsv: builder.mutation({
+    exportEmailAccountsCsv: builder.mutation({
       query: () => ({
         url: "export-email-accounts",
         method: "GET",
@@ -78,27 +77,33 @@ export const emailWarmupService = apiSlice.injectEndpoints({
     }),
 
     addProvider: builder.mutation({
-  query: (body) => ({
-    url: "add_provider",
-    method: "POST",
-    body,
-  }),
-  invalidatesTags: ["ProviderAccounts"],
-}),
+      query: (body) => ({
+        url: "add_provider",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["ProviderAccounts"],
+    }),
 
-addSmtpAccount: builder.mutation({
-  query: (body) => ({
-    url: "/smtps",
-    method: "POST",
-    body,
-  }),
-  invalidatesTags: ["SmtpAccounts"],
-}),
+    addSmtpAccount: builder.mutation({
+      query: (body) => ({
+        url: "smtps",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["SmtpAccounts"],
+    }),
 
-
-
-
-
+    getAllSmtpAccounts: builder.query({
+       query: (params) => {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.append("page", params.page);
+        if (params?.limit) queryParams.append("limit", params.limit);
+        if (params?.search) queryParams.append("search", params.search);
+        return `smtps?${queryParams.toString()}`;
+      },
+      providesTags: ["SmtpAccounts"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -113,5 +118,6 @@ export const {
   useSaveEmailNewMutation,
   useExportEmailAccountsCsvMutation,
   useAddProviderMutation,
-  useAddSmtpAccountMutation
+  useAddSmtpAccountMutation,
+  useGetAllSmtpAccountsQuery,
 } = emailWarmupService;
