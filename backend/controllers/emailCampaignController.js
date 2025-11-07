@@ -14,6 +14,9 @@ const imaps = require("imap-simple");
 const multer = require("multer");
 const { parse } = require("csv-parse");
 const { send_mail, send_mail1 } = require('../helpers/mailHelpers');
+const ProviderAccount = require('../models/ProviderAccount');
+const { verifyImap, verifySmtp } = require('../utils/mailVerification');
+const { encrypt } = require('../utils/encryption');
 
 const getAllEmailCampaigns = async (req, res) => {
   try {
@@ -966,8 +969,10 @@ const run_campaign = async (req, res) => {
     for (const campaign of campaigns) {
       const campaign_id = campaign.id;
       const user_id = campaign.user_id;
-      const limit = campaign.daily_limit;
-      const warmup_limit = campaign.warmup_limit;
+      // const limit = campaign.daily_limit;
+      // const warmup_limit = campaign.warmup_limit;
+      const limit = parseInt(campaign.daily_limit) || 0;
+      const warmup_limit = parseInt(campaign.warmup_limit) || 0;
 
       const eCampaigns = await EmailCampaign.findAll({
         order: Sequelize.literal('RAND()'),
@@ -1168,6 +1173,82 @@ const  run_campaign_by_cron = async (req, res) => {
   }
 };
 
+
+const addProvider = async (req, res) => {
+  try {
+    const b = req.body;
+
+    if (!b.email || !b.imap_host || !b.imap_pass) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const errors = [];
+
+    // 🔐 Encrypt passwords for DB
+    const imapPassEnc = encrypt(b.imap_pass || "");
+    const smtpPassEnc = b.smtp_pass ? encrypt(b.smtp_pass) : null;
+
+    // ✅ Verify IMAP
+    let imapOk = true;
+    try {
+      imapOk = await verifyImap({
+        host: b.imap_host,
+        port: b.imap_port || 993,
+        secure: !!b.imap_secure,
+        user: b.imap_user || b.email,
+        pass: b.imap_pass,
+      });
+    } catch (e) {
+      errors.push(`IMAP error: ${String(e.message || e)}`);
+    }
+
+    // ✅ Verify SMTP if provided
+    let smtpOk = true;
+    if (b.smtp_host && b.smtp_user && b.smtp_pass) {
+      try {
+        smtpOk = await verifySmtp({
+          host: b.smtp_host,
+          port: b.smtp_port || 465,
+          secure: !!b.smtp_secure,
+          user: b.smtp_user,
+          pass: b.smtp_pass,
+        });
+      } catch (e) {
+        smtpOk = false;
+        errors.push(`SMTP error: ${String(e.message || e)}`);
+      }
+    }
+
+    if (!imapOk || !smtpOk) {
+      return res.status(400).json({ status: "failed", errors });
+    }
+
+    // ✅ Insert into DB using Sequelize
+    const newProvider = await ProviderAccount.create({
+      label: b.label || null,
+      email: b.email,
+      provider: b.provider || "other",
+      imap_host: b.imap_host,
+      imap_port: b.imap_port || 993,
+      imap_secure: b.imap_secure ? 1 : 0,
+      imap_user: b.imap_user || b.email,
+      imap_pass: imapPassEnc,
+      smtp_host: b.smtp_host || null,
+      smtp_port: b.smtp_port || 465,
+      smtp_secure: b.smtp_secure ? 1 : 0,
+      smtp_user: b.smtp_user || b.email,
+      smtp_pass: smtpPassEnc,
+      enabled: b.enabled ? 1 : 1,
+    });
+
+    res.json({ inserted: !!newProvider, status: "inserted" });
+  } catch (e) {
+    console.error("Add Provider Error:", e);
+    res.status(500).json({ error: e.message });
+  }
+};
+
+
 module.exports = {
   getAllEmailCampaigns,
   getEmailCampaigns,
@@ -1178,5 +1259,6 @@ module.exports = {
   deleteCampaign,
   updateLimits,
   run_campaign,
-  run_campaign_by_cron
+  run_campaign_by_cron,
+  addProvider
 };
