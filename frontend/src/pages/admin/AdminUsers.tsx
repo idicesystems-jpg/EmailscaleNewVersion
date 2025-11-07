@@ -73,7 +73,8 @@ import {
   useUpdateUserStatusMutation,
   useLazyExportUsersCsvQuery,
   useUpdateUserRoleMutation,
-  useAdminChangeUserPasswordMutation
+  useAdminChangeUserPasswordMutation,
+  useGetUserCountersQuery
 } from "../../services/adminUserService";
 import Pagination from "../../components/Pagination";
 
@@ -98,6 +99,10 @@ const AdminUsers = () => {
    const { user, token, isAuthenticated } = useSelector(
     (state: any) => state.auth
   );
+
+  const { data:counterdata } = useGetUserCountersQuery();
+  console.log("counter data", counterdata?.data);
+  const counterUserData = counterdata?.data;
 
   //const isAdmin = user?.role_id == 1;
 
@@ -966,7 +971,8 @@ const AdminUsers = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {users?.length}
+                {/* {users?.length} */}
+                {counterUserData?.total_users}
               </div>
             </CardContent>
           </Card>
@@ -978,10 +984,11 @@ const AdminUsers = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {
+                {counterUserData?.active_users}
+                {/* {
                   users?.filter((u) => !u.account_locked && !u.account_paused)
                     .length
-                }
+                } */}
               </div>
             </CardContent>
           </Card>
@@ -993,7 +1000,8 @@ const AdminUsers = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-500">
-                {users?.filter((u) => u.account_locked).length}
+                {counterUserData?.inactive_users}
+                {/* {users?.filter((u) => u.account_locked).length} */}
               </div>
             </CardContent>
           </Card>
@@ -1079,7 +1087,7 @@ const AdminUsers = () => {
                       <TableRow
                         key={user.id}
                         className={
-                          user.account_locked ? "bg-destructive/5" : ""
+                          user.status ===0 ? "bg-destructive/5" : ""
                         }
                       >
                         <TableCell className="w-12">
@@ -1183,15 +1191,12 @@ const AdminUsers = () => {
                         </TableCell>
                         <TableCell>
                           <span
-                            className={`px-2 py-1 rounded text-xs ${
-                              user.status == "1"
-                                ? "bg-red-500/20 text-red-500"
-                                : user.status == "1"
+                            className={`px-2 py-1 rounded text-xs ${user.status == "1"
                                 ? "bg-green-500/20 text-green-500"
                                 : "bg-orange-500/20 text-orange-500"
                             }`}
                           >
-                            {user.status == "1" ? "Active" : "Inactive"}
+                            {user.status == "1" ? "Active" : "Locked"}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -1307,7 +1312,7 @@ const AdminUsers = () => {
                                       : "Resume account"
                                   }
                                 >
-                                  {user.status == "1" ? (
+                                  {user.status == "2" ? (
                                     <Pause className="h-4 w-4 text-red-500" />
                                   ) : (
                                     <Play className="h-4 w-4 text-green-500" />

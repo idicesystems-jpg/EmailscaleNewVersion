@@ -68,16 +68,20 @@ import { useSelector } from "react-redux";
 import { toast } from "sonner";
 import { Trash2, Plus, MessageSquare, User, Clock } from "lucide-react";
 import Pagination from "../components/Pagination";
+import { useImpersonation } from "@/hooks/useImpersonation";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 const Support = () => {
+  const { impersonatedUserId } = useImpersonation();
   const [showTicketPrompt, setShowTicketPrompt] = useState(false);
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [showChatDialog, setShowChatDialog] = useState(false);
   const [showFaqDialog, setShowFaqDialog] = useState(false);
   const [showVideosDialog, setShowVideosDialog] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+   const [showTicketDialog, setShowTicketDialog] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const [ticketId, setTicketId] = useState(null);
   const [ticket, setTicket] = useState(null);
@@ -315,61 +319,83 @@ const Support = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Support</h1>
           <p className="text-muted-foreground">
             Get help and support for EmailScale
           </p>
         </div>
+        <Button onClick={() => setShowTicketForm(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Ticket
+          </Button>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Support Ticket */}
-          <Card
-            className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-colors cursor-pointer"
-            onClick={handleTicketClick}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center text-foreground">
-                <Ticket className="h-5 w-5 mr-2 text-primary" />
-                Support Ticket
-              </CardTitle>
-              <CardDescription>
-                Submit a support ticket to our team
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full bg-gradient-to-r from-primary to-primary-glow">
-                Create Ticket
-              </Button>
-            </CardContent>
-          </Card>
+         {/* My Support Tickets */}
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Ticket className="h-5 w-5 text-primary" />
+              My Support Tickets
+            </CardTitle>
+            <CardDescription>View and respond to your support requests</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {tickets?.data?.length === 0 ? (
+              <div className="text-center py-12">
+                <Ticket className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground mb-4">No support tickets yet</p>
+                <Button onClick={() => setShowTicketForm(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Ticket
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tickets?.data?.map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    onClick={() => handleViewTicket(ticket)}
+                    className="p-4 border border-border rounded-lg hover:border-primary/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant={
+                            ticket.status === 'resolved' || ticket.status === 'closed' ? 'default' :
+                            ticket.status === 'in_progress' ? 'secondary' :
+                            'outline'
+                          }>
+                            {ticket.status.replace('_', ' ')}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            #Tick - {ticket.id}
+                          </span>
+                        </div>
+                        <p className="font-medium text-foreground">{ticket.subject}</p>
+                        {ticket.description && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {ticket.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground ml-4">
+                        <Clock className="h-3 w-3" />
+                        {new Date(ticket.updated_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Live AI Chat */}
-          <Card
-            className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-colors cursor-pointer"
-            onClick={() => setShowChatDialog(true)}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center text-foreground">
-                <MessageCircle className="h-5 w-5 mr-2 text-primary" />
-                Live AI Chat
-              </CardTitle>
-              <CardDescription>
-                Get instant answers from our AI assistant
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" variant="outline">
-                Start Chat
-              </Button>
-            </CardContent>
-          </Card>
 
-          {/* FAQs */}
-          <Card
-            className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-colors cursor-pointer"
-            onClick={() => setShowFaqDialog(true)}
-          >
+        {/* Quick Support Resources */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-border hover:border-primary/50 transition-colors">
             <CardHeader>
               <CardTitle className="flex items-center text-foreground">
                 <HelpCircle className="h-5 w-5 mr-2 text-primary" />
@@ -378,60 +404,81 @@ const Support = () => {
               <CardDescription>Common questions and answers</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full" variant="outline">
-                View FAQs
-              </Button>
+              <Button className="w-full" variant="outline">View FAQs</Button>
             </CardContent>
           </Card>
 
-          {/* Helpful Videos */}
-          <Card
-            className="bg-card/50 backdrop-blur-sm border-border hover:border-primary/50 transition-colors cursor-pointer"
-            onClick={() => setShowVideosDialog(true)}
-          >
+          <Card className="border-border hover:border-primary/50 transition-colors">
             <CardHeader>
               <CardTitle className="flex items-center text-foreground">
                 <Video className="h-5 w-5 mr-2 text-primary" />
-                Helpful Videos
+                Video Tutorials
               </CardTitle>
-              <CardDescription>Learn with our video tutorials</CardDescription>
+              <CardDescription>Learn with step-by-step guides</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full" variant="outline">
-                Watch Videos
-              </Button>
+              <Button className="w-full" variant="outline">Watch Videos</Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border hover:border-primary/50 transition-colors">
+            <CardHeader>
+              <CardTitle className="flex items-center text-foreground">
+                <MessageCircle className="h-5 w-5 mr-2 text-primary" />
+                Documentation
+              </CardTitle>
+              <CardDescription>Comprehensive guides and docs</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full" variant="outline">Read Docs</Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Ticket Prompt Dialog */}
-        <AlertDialog open={showTicketPrompt} onOpenChange={setShowTicketPrompt}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                Have you checked our resources?
-              </AlertDialogTitle>
-              <AlertDialogDescription className="space-y-2">
-                <p>
-                  Before creating a support ticket, we recommend checking our:
-                </p>
-                <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>Video Library - Step-by-step tutorials</li>
-                  <li>FAQ Section - Common questions and answers</li>
-                </ul>
-                <p className="mt-4">
-                  You might find a quick answer to your question there!
-                </p>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleProceedToTicket}>
-                Continue to Create Ticket
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+
+         {/* Ticket Chat Dialog */}
+        <Dialog open={showTicketDialog} onOpenChange={setShowTicketDialog}>
+          <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
+            <DialogHeader className="border-b pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5 text-primary" />
+                    {selectedTicket?.ticket_number}
+                  </DialogTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {selectedTicket?.subject}
+                  </p>
+                </div>
+                <Badge variant={
+                  selectedTicket?.status === 'resolved' || selectedTicket?.status === 'closed' ? 'default' :
+                  selectedTicket?.status === 'in_progress' ? 'secondary' :
+                  'outline'
+                }>
+                  {selectedTicket?.status?.replace('_', ' ')}
+                </Badge>
+              </div>
+            </DialogHeader>
+            
+         
+          </DialogContent>
+        </Dialog>
+
+
+
+
+
+
+
+
+
+
+
+
+
+       
+
+       
 
         {/* Ticket Form Dialog */}
         <Dialog open={showTicketForm} onOpenChange={setShowTicketForm}>
@@ -489,7 +536,7 @@ const Support = () => {
                 />
               </div>
               <div>
-                <Label>Description</Label>
+                <Label>Message</Label>
                 <Textarea
                   value={newTicket.message}
                   onChange={(e) =>
@@ -498,7 +545,7 @@ const Support = () => {
                       message: e.target.value,
                     })
                   }
-                  placeholder="Detailed description..."
+                  placeholder="Please describe your issue in detail..."
                   rows={4}
                 />
               </div>
@@ -534,131 +581,9 @@ const Support = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Live Chat Dialog */}
-        <Dialog open={showChatDialog} onOpenChange={setShowChatDialog}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 text-primary" />
-                Live AI Assistant
-              </DialogTitle>
-              <DialogDescription>
-                Get instant answers to your questions
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="border border-border rounded-lg p-4 h-[400px] overflow-y-auto space-y-4 bg-muted/20">
-                {chatMessages.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    <p>Start a conversation with our AI assistant</p>
-                  </div>
-                ) : (
-                  chatMessages.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex ${
-                        msg.role === "user" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`max-w-[80%] p-3 rounded-lg ${
-                          msg.role === "user"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-card border border-border"
-                        }`}
-                      >
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Type your message..."
-                  value={chatMessage}
-                  onChange={(e) => setChatMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!chatMessage.trim()}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+       
 
-        {/* FAQs Dialog */}
-        <Dialog open={showFaqDialog} onOpenChange={setShowFaqDialog}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <HelpCircle className="h-5 w-5 text-primary" />
-                Frequently Asked Questions
-              </DialogTitle>
-              <DialogDescription>
-                Find quick answers to common questions
-              </DialogDescription>
-            </DialogHeader>
-            <Accordion type="single" collapsible className="w-full">
-              {faqs.map((faq, index) => (
-                <AccordionItem key={index} value={`item-${index}`}>
-                  <AccordionTrigger className="text-left">
-                    {faq.question}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground">
-                    {faq.answer}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </DialogContent>
-        </Dialog>
-
-        {/* Videos Dialog */}
-        <Dialog open={showVideosDialog} onOpenChange={setShowVideosDialog}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Video className="h-5 w-5 text-primary" />
-                Helpful Video Tutorials
-              </DialogTitle>
-              <DialogDescription>
-                Learn how to use EmailScale with our video guides
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              {videos.map((video, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-4 border border-border rounded-lg hover:border-primary/50 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                      <Video className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {video.title}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {video.duration}
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    Watch
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Card className="border-border">
+        {/* <Card className="border-border">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -668,18 +593,7 @@ const Support = () => {
                 </CardDescription>
               </div>
               <div>
-                {/* <select
-                  className="form-control"
-                  value={filter.status}
-                  onChange={(e) => {
-                    setPage(1); // reset page when filter changes
-                    setFilter({ ...filter, status: e.target.value });
-                  }}
-                >
-                  <option value="">All Status</option>
-                  <option value="open">Open</option>
-                  <option value="closed">Closed</option>
-                </select> */}
+               
                 <Select
                   value={filter.status}
                   onValueChange={(v) => {
@@ -698,19 +612,7 @@ const Support = () => {
                 </Select>
               </div>
               <div>
-                {/* <select
-                  className="form-control"
-                  value={filter.priority}
-                  onChange={(e) => {
-                    setPage(1); // reset page when filter changes
-                    setFilter({ ...filter, priority: e.target.value });
-                  }}
-                >
-                  <option value="">All Priorities</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select> */}
+               
                 <Select
                   value={filter.priority}
                   onValueChange={(v) => {
@@ -811,20 +713,41 @@ const Support = () => {
               </>
             )}
           </CardContent>
-        </Card>
+        </Card> */}
         {/* Ticket Details Dialog */}
         <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
+               <div className="flex items-center justify-between">
+                <div>
               <DialogTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-primary" />
-                Ticket Details - {selectedTicket?.id}
+                 TICK - {selectedTicket?.id}
               </DialogTitle>
+               <p className="text-sm text-muted-foreground mt-1">
+                                  {selectedTicket?.user?.name || "-"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={
+                                    selectedTicket?.priority === "high"
+                                      ? "destructive"
+                                      : selectedTicket?.priority === "medium"
+                                      ? "secondary"
+                                      : "default"
+                                  }
+                                >
+                                  {selectedTicket?.priority}
+                                </Badge>
+                                <Badge variant="outline">{selectedTicket?.status}</Badge>
+                              </div>
+                            </div>
             </DialogHeader>
             {selectedTicket && (
               <div className="space-y-6">
                 {/* Ticket Info */}
-                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/20 rounded-lg">
+                {/* <div className="grid grid-cols-2 gap-4 p-4 bg-muted/20 rounded-lg">
                   <div>
                     <p className="text-sm text-muted-foreground">User</p>
                     <p className="font-medium flex items-center gap-2">
@@ -857,10 +780,10 @@ const Support = () => {
                     <p className="text-sm text-muted-foreground">Status</p>
                     <Badge variant="outline">{selectedTicket.status}</Badge>
                   </div>
-                </div>
+                </div> */}
 
                 {/* Subject & Description */}
-                <div className="space-y-3">
+                {/* <div className="space-y-3">
                   <div>
                     <Label className="text-sm text-muted-foreground">
                       Subject
@@ -875,7 +798,7 @@ const Support = () => {
                       {selectedTicket.message || "No description provided"}
                     </p>
                   </div>
-                </div>
+                </div> */}
 
                 {/* conversation section */}
 
@@ -923,29 +846,31 @@ const Support = () => {
                       <div className="px-3 pt-4">
                         <div className="mb-4">
                           {replies.map((reply) => (
-                            <div key={reply.id} className="d-flex mb-3">
+                            <div key={reply.id} className="flex gap-3 mb-3">
                               <div
                                 className="rounded-circle text-white d-flex justify-content-center align-items-center"
                                 style={{
                                   width: 40,
                                   height: 40,
                                   fontWeight: "bold",
-                                  backgroundColor: "#d946ef",
+                                  backgroundColor: "#e236a91a",
                                   borderRadius: "50%",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   display: "flex",
+                                  borderColor:"#e236a91a",
+                                  color:"#e236a9",
                                 }}
                               >
                                 {getInitials(reply.user.name)}
                               </div>
                               <div
-                                className={`ms-2 me-2 p-3 rounded shadow-sm ${
-                                  reply.name === "Admin"
-                                    ? "bg-light border"
-                                    : "bg-white border"
-                                }`}
-                                style={{ maxWidth: "85%" }}
+                                // className={`ms-2 me-2 p-3 rounded shadow-sm ${
+                                //   reply.name === "Admin"
+                                //     ? "bg-light border"
+                                //     : "bg-white border"
+                                // }`}
+                                style={{ maxWidth: "85%", width:"100%" }}
                               >
                                 <div className="mb-1">
                                   <strong>{reply.user.name}</strong>{" "}
@@ -958,8 +883,9 @@ const Support = () => {
                                     ).toLocaleString()}
                                   </small>
                                 </div>
-                                <p className="mb-1">{reply.message}</p>
-
+  <div className="bg-muted/50 rounded-lg p-3">
+                              <p className="text-sm whitespace-pre-wrap">{reply.message}</p>
+                            </div>
                                 {reply.file && (
                                   <a
                                     href={`${API_URL}files/${reply.file}`}

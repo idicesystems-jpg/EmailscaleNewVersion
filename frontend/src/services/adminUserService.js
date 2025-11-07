@@ -140,6 +140,14 @@ export const adminUserService = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Users"],
     }),
+
+    getUserCounters: builder.query({
+      query: () => ({
+        url: "user-counters",
+        method: "GET",
+      }),
+      providesTags: ["Users"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -159,4 +167,5 @@ export const {
   useGetAdminListQuery,
   useUpdateUserRoleMutation,
   useAdminChangeUserPasswordMutation,
+  useGetUserCountersQuery,
 } = adminUserService;
