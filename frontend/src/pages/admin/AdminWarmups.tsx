@@ -62,6 +62,7 @@ import {
   useExportEmailAccountsCsvMutation,
   useDeleteEmailAccountsMutation,
   useAddProviderMutation,
+  useAddSmtpAccountMutation,
 } from "../../services/emailWarmupService";
 import { useImpersonation } from "@/hooks/useImpersonation";
 
@@ -88,6 +89,7 @@ const AdminWarmups = () => {
   const [poolLoading, setPoolLoading] = useState(false);
   const [logsLoading, setLogsLoading] = useState(true);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addSmtpDialogOpen, setAddSmtpDialogOpen] = useState(false);
   const [bulkUploadDialogOpen, setBulkUploadDialogOpen] = useState(false);
   const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
@@ -125,7 +127,18 @@ const AdminWarmups = () => {
     enabled: true,
   });
 
-  console.log("newAccount", newAccount);
+  const [smtpnewAccount, setSmtpNewAccount] = useState({
+    label: "",
+    from_name: "",
+    from_email: "",
+    smtp_host: "",
+    smtp_port: 465,
+    smtp_secure: 1,
+    smtp_user: "",
+    smtp_pass: "",
+    daily_limit: 40,
+    enabled: true,
+  });
 
   useEffect(() => {
     //fetchWarmups();
@@ -211,71 +224,73 @@ const AdminWarmups = () => {
     }
   };
 
-const [errors, setErrors] = useState({});
-interface AccountErrors {
-  [key: string]: string;
-}
+  const [errors, setErrors] = useState({});
+  interface AccountErrors {
+    [key: string]: string;
+  }
   const validateAccountForm = (): boolean => {
-  const newErrors: AccountErrors = {};
+    const newErrors: AccountErrors = {};
 
-  // --- Basic Fields ---
-  if (!newAccount.label.trim()) {
-    newErrors.label = "Label is required";
-  }
+    // --- Basic Fields ---
+    // if (!newAccount.label.trim()) {
+    //   newErrors.label = "Label is required";
+    // }
 
-  if (!newAccount.email.trim()) {
-    newErrors.email = "Email is required";
-  } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(newAccount.email)) {
-    newErrors.email = "Invalid email format";
-  }
+    if (!newAccount.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (
+      !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(newAccount.email)
+    ) {
+      newErrors.email = "Invalid email format";
+    }
 
-  // --- IMAP Fields ---
-  if (!newAccount.imap_host.trim()) {
-    newErrors.imap_host = "IMAP host is required";
-  }
+    // --- IMAP Fields ---
+    if (!newAccount.imap_host.trim()) {
+      newErrors.imap_host = "IMAP host is required";
+    }
 
-  if (!newAccount.imap_port || isNaN(Number(newAccount.imap_port))) {
-    newErrors.imap_port = "Valid IMAP port is required";
-  }
+    if (!newAccount.imap_port || isNaN(Number(newAccount.imap_port))) {
+      newErrors.imap_port = "Valid IMAP port is required";
+    }
 
-  if (!newAccount.imap_user.trim()) {
-    newErrors.imap_user = "IMAP username is required";
-  }
+    if (!newAccount.imap_user.trim()) {
+      newErrors.imap_user = "IMAP username is required";
+    }
 
-  if (!newAccount.imap_pass.trim()) {
-    newErrors.imap_pass = "IMAP password is required";
-  }
+    if (!newAccount.imap_pass.trim()) {
+      newErrors.imap_pass = "IMAP password is required";
+    }
 
-  // --- SMTP Fields ---
-  if (!newAccount.smtp_host.trim()) {
-    newErrors.smtp_host = "SMTP host is required";
-  }
+    // --- SMTP Fields ---
+    if (!newAccount.smtp_host.trim()) {
+      newErrors.smtp_host = "SMTP host is required";
+    }
 
-  if (!newAccount.smtp_port || isNaN(Number(newAccount.smtp_port))) {
-    newErrors.smtp_port = "Valid SMTP port is required";
-  }
+    if (!newAccount.smtp_port || isNaN(Number(newAccount.smtp_port))) {
+      newErrors.smtp_port = "Valid SMTP port is required";
+    }
 
-  if (!newAccount.smtp_user.trim()) {
-    newErrors.smtp_user = "SMTP username is required";
-  }
+    if (!newAccount.smtp_user.trim()) {
+      newErrors.smtp_user = "SMTP username is required";
+    }
 
-  if (!newAccount.smtp_pass.trim()) {
-    newErrors.smtp_pass = "SMTP password is required";
-  }
+    // if (!newAccount.smtp_pass.trim()) {
+    //   newErrors.smtp_pass = "SMTP password is required";
+    // }
 
-  // --- Optional Boolean Flags ---
-  if (![0, 1, true, false].includes(newAccount.imap_secure)) {
-    newErrors.imap_secure = "IMAP secure must be true or false";
-  }
+    // --- Optional Boolean Flags ---
+    if (![0, 1, true, false].includes(newAccount.imap_secure)) {
+      newErrors.imap_secure = "IMAP secure must be true or false";
+    }
 
-  if (![0, 1, true, false].includes(newAccount.smtp_secure)) {
-    newErrors.smtp_secure = "SMTP secure must be true or false";
-  }
+    if (![0, 1, true, false].includes(newAccount.smtp_secure)) {
+      newErrors.smtp_secure = "SMTP secure must be true or false";
+    }
 
-  setErrors(newErrors);
+    setErrors(newErrors);
 
-  return Object.keys(newErrors).length === 0;
-};
+    return Object.keys(newErrors).length === 0;
+  };
 
   const [addProvider] = useAddProviderMutation();
   const handleAddPoolAccount = async (e) => {
@@ -294,6 +309,73 @@ interface AccountErrors {
       setAddDialogOpen(false);
     } catch (err) {
       console.error("Unexpected error adding pool account:", err);
+      toast.error("An unexpected error occurred while adding account.");
+    }
+  };
+
+  const smtpValidateAccountForm = (): boolean => {
+    const newErrors: AccountErrors = {};
+
+    // --- Basic Fields ---
+    if (!smtpnewAccount.from_name.trim()) {
+      newErrors.from_name = "Label is required";
+    }
+
+    if (!smtpnewAccount.from_email.trim()) {
+      newErrors.from_email = "Email is required";
+    } else if (
+      !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(
+        smtpnewAccount.from_email
+      )
+    ) {
+      newErrors.from_email = "Invalid email format";
+    }
+
+    // --- SMTP Fields ---
+    if (!smtpnewAccount.smtp_host.trim()) {
+      newErrors.smtp_host = "SMTP host is required";
+    }
+
+    if (!smtpnewAccount.smtp_port || isNaN(Number(smtpnewAccount.smtp_port))) {
+      newErrors.smtp_port = "Valid SMTP port is required";
+    }
+
+    if (!smtpnewAccount.smtp_user.trim()) {
+      newErrors.smtp_user = "SMTP username is required";
+    }
+
+    if (!smtpnewAccount.smtp_pass.trim()) {
+      newErrors.smtp_pass = "SMTP password is required";
+    }
+
+    // --- Optional Boolean Flag ---
+    if (![0, 1, true, false].includes(smtpnewAccount.smtp_secure)) {
+      newErrors.smtp_secure = "SMTP secure must be true or false";
+    }
+
+    setErrors(newErrors);
+
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const [addSmtpAccount] = useAddSmtpAccountMutation();
+
+  const handleAddSmtpAccount = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    if (!smtpValidateAccountForm()) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await addSmtpAccount(smtpnewAccount).unwrap();
+      toast.success("SMTP Account added successfully!");
+      setSmtpNewAccount({} as any);
+      setAddSmtpDialogOpen(false);
+    } catch (err) {
+      console.error("Unexpected error adding SMTP account:", err);
       toast.error("An unexpected error occurred while adding account.");
     }
   };
@@ -718,10 +800,10 @@ interface AccountErrors {
                                 placeholder="email@example.com"
                               />
                               {errors.email && (
-                            <p className="text-red-500 text-sm">
-                              {errors.email}
-                            </p>
-                          )}
+                                <p className="text-red-500 text-sm">
+                                  {errors.email}
+                                </p>
+                              )}
                             </div>
                             <div>
                               <Label>Provider</Label>
@@ -744,11 +826,11 @@ interface AccountErrors {
                                   <SelectItem value="other">Other</SelectItem>
                                 </SelectContent>
                               </Select>
-                               {errors.provider && (
-                            <p className="text-red-500 text-sm">
-                              {errors.provider}
-                            </p>
-                          )}
+                              {errors.provider && (
+                                <p className="text-red-500 text-sm">
+                                  {errors.provider}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
@@ -763,11 +845,11 @@ interface AccountErrors {
                                   })
                                 }
                               />
-                                  {errors.smtp_host && (
-                            <p className="text-red-500 text-sm">
-                              {errors.smtp_host}
-                            </p>
-                          )}
+                              {errors.smtp_host && (
+                                <p className="text-red-500 text-sm">
+                                  {errors.smtp_host}
+                                </p>
+                              )}
                             </div>
                             <div>
                               <Label>SMTP Port</Label>
@@ -781,11 +863,11 @@ interface AccountErrors {
                                   })
                                 }
                               />
-                                  {errors.smtp_port && (
-                            <p className="text-red-500 text-sm">
-                              {errors.smtp_port}
-                            </p>
-                          )}
+                              {errors.smtp_port && (
+                                <p className="text-red-500 text-sm">
+                                  {errors.smtp_port}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
@@ -800,11 +882,11 @@ interface AccountErrors {
                                   })
                                 }
                               />
-                                    {errors.smtp_user && (
-                            <p className="text-red-500 text-sm">
-                              {errors.smtp_user}
-                            </p>
-                          )}
+                              {errors.smtp_user && (
+                                <p className="text-red-500 text-sm">
+                                  {errors.smtp_user}
+                                </p>
+                              )}
                             </div>
                             <div>
                               <Label>SMTP Password</Label>
@@ -818,11 +900,11 @@ interface AccountErrors {
                                   })
                                 }
                               />
-                               {errors.smtp_pass && (
-                            <p className="text-red-500 text-sm">
-                              {errors.smtp_pass}
-                            </p>
-                          )}
+                              {errors.smtp_pass && (
+                                <p className="text-red-500 text-sm">
+                                  {errors.smtp_pass}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
@@ -837,11 +919,11 @@ interface AccountErrors {
                                   })
                                 }
                               />
-                               {errors.imap_host && (
-                            <p className="text-red-500 text-sm">
-                              {errors.imap_host}
-                            </p>
-                          )}
+                              {errors.imap_host && (
+                                <p className="text-red-500 text-sm">
+                                  {errors.imap_host}
+                                </p>
+                              )}
                             </div>
                             <div>
                               <Label>IMAP Port</Label>
@@ -855,11 +937,11 @@ interface AccountErrors {
                                   })
                                 }
                               />
-                               {errors.imap_port && (
-                            <p className="text-red-500 text-sm">
-                              {errors.imap_port}
-                            </p>
-                          )}
+                              {errors.imap_port && (
+                                <p className="text-red-500 text-sm">
+                                  {errors.imap_port}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
@@ -874,11 +956,11 @@ interface AccountErrors {
                                   })
                                 }
                               />
-                               {errors.imap_user && (
-                            <p className="text-red-500 text-sm">
-                              {errors.imap_user}
-                            </p>
-                          )}
+                              {errors.imap_user && (
+                                <p className="text-red-500 text-sm">
+                                  {errors.imap_user}
+                                </p>
+                              )}
                             </div>
                             <div>
                               <Label>IMAP Password</Label>
@@ -892,11 +974,11 @@ interface AccountErrors {
                                   })
                                 }
                               />
-                                {errors.imap_pass && (
-                            <p className="text-red-500 text-sm">
-                              {errors.imap_pass }
-                            </p>
-                          )}
+                              {errors.imap_pass && (
+                                <p className="text-red-500 text-sm">
+                                  {errors.imap_pass}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1152,6 +1234,245 @@ interface AccountErrors {
                     <Download className="h-4 w-4 mr-2" />
                     Export
                   </Button>
+                  {/* add smtp account */}
+                  <Dialog
+                    open={addSmtpDialogOpen}
+                    onOpenChange={setAddSmtpDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add SMTP Account
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>Add SMTP Account</DialogTitle>
+                        <DialogDescription>
+                          Add a new SMTP account to the warmup pool
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4">
+                        {/* Name & Email */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Name</Label>
+                            <Input
+                              value={smtpnewAccount.from_name}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  from_name: e.target.value,
+                                })
+                              }
+                              placeholder="Sender name"
+                            />
+                            {errors.from_name && (
+                              <p className="text-red-500 text-sm">
+                                {errors.from_name}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label>Email Address</Label>
+                            <Input
+                              value={smtpnewAccount.from_email}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  from_email: e.target.value,
+                                })
+                              }
+                              placeholder="email@example.com"
+                            />
+                            {errors.from_email && (
+                              <p className="text-red-500 text-sm">
+                                {errors.from_email}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* SMTP Settings */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>SMTP Host</Label>
+                            <Input
+                              value={smtpnewAccount.smtp_host}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  smtp_host: e.target.value,
+                                })
+                              }
+                            />
+                            {errors.smtp_host && (
+                              <p className="text-red-500 text-sm">
+                                {errors.smtp_host}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label>SMTP Port</Label>
+                            <Input
+                              type="number"
+                              value={smtpnewAccount.smtp_port}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  smtp_port: parseInt(e.target.value) || 587,
+                                })
+                              }
+                            />
+                            {errors.smtp_port && (
+                              <p className="text-red-500 text-sm">
+                                {errors.smtp_port}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>SMTP Username</Label>
+                            <Input
+                              value={smtpnewAccount.smtp_user}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  smtp_user: e.target.value,
+                                })
+                              }
+                            />
+                            {errors.smtp_user && (
+                              <p className="text-red-500 text-sm">
+                                {errors.smtp_user}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label>SMTP Password</Label>
+                            <Input
+                              type="password"
+                              value={smtpnewAccount.smtp_pass}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  smtp_pass: e.target.value,
+                                })
+                              }
+                            />
+                            {errors.smtp_pass && (
+                              <p className="text-red-500 text-sm">
+                                {errors.smtp_pass}
+                              </p>
+                            )}
+                          </div>
+                           <div>
+                            <Label>Daily Limit</Label>
+                            <Input
+                              type="number"
+                              value={smtpnewAccount.daily_limit}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  daily_limit: e.target.value,
+                                })
+                              }
+                            />
+                            {errors.daily_limit && (
+                              <p className="text-red-500 text-sm">
+                                {errors.daily_limit}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* IMAP Settings */}
+                        {/* <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>IMAP Host</Label>
+                            <Input
+                              value={smtpnewAccount.imap_host}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  imap_host: e.target.value,
+                                })
+                              }
+                            />
+                            {errors.imap_host && (
+                              <p className="text-red-500 text-sm">
+                                {errors.imap_host}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label>IMAP Port</Label>
+                            <Input
+                              type="number"
+                              value={smtpnewAccount.imap_port}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  imap_port: parseInt(e.target.value) || 993,
+                                })
+                              }
+                            />
+                            {errors.imap_port && (
+                              <p className="text-red-500 text-sm">
+                                {errors.imap_port}
+                              </p>
+                            )}
+                          </div>
+                        </div> 
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>IMAP Username</Label>
+                            <Input
+                              value={smtpnewAccount.imap_user}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  imap_user: e.target.value,
+                                })
+                              }
+                            />
+                            {errors.imap_user && (
+                              <p className="text-red-500 text-sm">
+                                {errors.imap_user}
+                              </p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label>IMAP Password</Label>
+                            <Input
+                              type="password"
+                              value={smtpnewAccount.imap_pass}
+                              onChange={(e) =>
+                                setSmtpNewAccount({
+                                  ...smtpnewAccount,
+                                  imap_pass: e.target.value,
+                                })
+                              }
+                            />
+                            {errors.imap_pass && (
+                              <p className="text-red-500 text-sm">
+                                {errors.imap_pass}
+                              </p>
+                            )}
+                          </div>
+                        </div> */}
+                      </div>
+
+                      <Button onClick={handleAddSmtpAccount}>Add SMTP</Button>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
