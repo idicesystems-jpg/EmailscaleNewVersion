@@ -1248,6 +1248,70 @@ const addProvider = async (req, res) => {
   }
 };
 
+const getProviders = async (req, res) => {
+  try {
+    // 🔹 Pagination and search query params
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search ? req.query.search.trim() : "";
+    const offset = (page - 1) * limit;
+
+    // 🔹 Build search condition
+    const whereCondition = search
+      ? {
+          [Op.or]: [
+            { label: { [Op.like]: `%${search}%` } },
+            { email: { [Op.like]: `%${search}%` } },
+            { provider: { [Op.like]: `%${search}%` } },
+            { imap_host: { [Op.like]: `%${search}%` } },
+            { smtp_host: { [Op.like]: `%${search}%` } },
+          ],
+        }
+      : {};
+
+    // 🔹 Get records + count for pagination
+    const { rows, count } = await ProviderAccount.findAndCountAll({
+      where: whereCondition,
+      attributes: [
+        "id",
+        "label",
+        "email",
+        "provider",
+        "imap_host",
+        "imap_port",
+        "imap_secure",
+        "smtp_host",
+        "smtp_port",
+        "smtp_secure",
+        "enabled"
+      ],
+      order: [["id", "DESC"]],
+      limit,
+      offset,
+    });
+
+    const totalPages = Math.ceil(count / limit);
+
+    res.status(200).json({
+      status: true,
+      message: "Provider accounts fetched successfully",
+      data: rows,
+      pagination: {
+        totalRecords: count,
+        totalPages,
+        currentPage: page,
+        pageSize: limit,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching provider accounts:", error);
+    res.status(500).json({
+      status: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
 
 module.exports = {
   getAllEmailCampaigns,
@@ -1260,5 +1324,6 @@ module.exports = {
   updateLimits,
   run_campaign,
   run_campaign_by_cron,
-  addProvider
+  addProvider,
+  getProviders
 };
