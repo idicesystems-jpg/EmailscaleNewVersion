@@ -60,12 +60,13 @@ import {
   useFetchEmailProviderCountsQuery,
   useSaveEmailNewMutation,
   useExportEmailAccountsCsvMutation,
-  useDeleteEmailAccountsMutation
+  useDeleteEmailAccountsMutation,
+  useAddProviderMutation,
 } from "../../services/emailWarmupService";
 import { useImpersonation } from "@/hooks/useImpersonation";
 
 const AdminWarmups = () => {
-   const { impersonatedUserId } = useImpersonation();
+  const { impersonatedUserId } = useImpersonation();
   // Component for managing warmup accounts and pool
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -98,24 +99,33 @@ const AdminWarmups = () => {
 
   const [saveEmailNew] = useSaveEmailNewMutation();
 
-  console.log("Fetched warmup data:", data?.data);
+  //console.log("Fetched warmup data:", data?.data);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [logsCurrentPage, setLogsCurrentPage] = useState(1);
   const [selectedWarmupRows, setSelectedWarmupRows] = useState<string[]>([]);
   const itemsPerPage = 10;
   const [newAccount, setNewAccount] = useState({
-    email_address: "",
+    label: "",
+    email: "",
     provider: "gmail",
-    smtp_host: "",
-    smtp_port: 587,
-    smtp_username: "",
-    smtp_password: "",
+
     imap_host: "",
     imap_port: 993,
-    imap_username: "",
-    imap_password: "",
+    imap_secure: 1,
+    imap_user: "",
+    imap_pass: "",
+
+    smtp_host: "",
+    smtp_port: 465,
+    smtp_secure: 1,
+    smtp_user: "",
+    smtp_pass: "",
+
+    enabled: true,
   });
+
+  console.log("newAccount", newAccount);
 
   useEffect(() => {
     //fetchWarmups();
@@ -141,7 +151,7 @@ const AdminWarmups = () => {
   const fetchInboxes = async () => {
     const { data, error } = await supabase
       .from("inboxes")
-      .select("id, email_address, health_score")
+      .select("id, email, health_score")
       .order("health_score", { ascending: false });
 
     if (error) {
@@ -187,8 +197,7 @@ const AdminWarmups = () => {
     }
   };
 
-
-   const [deleteEmailAccounts] = useDeleteEmailAccountsMutation();
+  const [deleteEmailAccounts] = useDeleteEmailAccountsMutation();
 
   const handleDeleteWarmup = async (warmupId: string) => {
     if (!confirm("Are you sure you want to delete this warmup account?"))
@@ -202,28 +211,90 @@ const AdminWarmups = () => {
     }
   };
 
-  const handleAddPoolAccount = async () => {
-    const { error } = await supabase.from("warmup_pool").insert([newAccount]);
+const [errors, setErrors] = useState({});
+interface AccountErrors {
+  [key: string]: string;
+}
+  const validateAccountForm = (): boolean => {
+  const newErrors: AccountErrors = {};
 
-    if (error) {
-      toast.error("Error adding account to pool");
-      console.error(error);
-    } else {
-      toast.success("Account added to warmup pool");
+  // --- Basic Fields ---
+  if (!newAccount.label.trim()) {
+    newErrors.label = "Label is required";
+  }
+
+  if (!newAccount.email.trim()) {
+    newErrors.email = "Email is required";
+  } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(newAccount.email)) {
+    newErrors.email = "Invalid email format";
+  }
+
+  // --- IMAP Fields ---
+  if (!newAccount.imap_host.trim()) {
+    newErrors.imap_host = "IMAP host is required";
+  }
+
+  if (!newAccount.imap_port || isNaN(Number(newAccount.imap_port))) {
+    newErrors.imap_port = "Valid IMAP port is required";
+  }
+
+  if (!newAccount.imap_user.trim()) {
+    newErrors.imap_user = "IMAP username is required";
+  }
+
+  if (!newAccount.imap_pass.trim()) {
+    newErrors.imap_pass = "IMAP password is required";
+  }
+
+  // --- SMTP Fields ---
+  if (!newAccount.smtp_host.trim()) {
+    newErrors.smtp_host = "SMTP host is required";
+  }
+
+  if (!newAccount.smtp_port || isNaN(Number(newAccount.smtp_port))) {
+    newErrors.smtp_port = "Valid SMTP port is required";
+  }
+
+  if (!newAccount.smtp_user.trim()) {
+    newErrors.smtp_user = "SMTP username is required";
+  }
+
+  if (!newAccount.smtp_pass.trim()) {
+    newErrors.smtp_pass = "SMTP password is required";
+  }
+
+  // --- Optional Boolean Flags ---
+  if (![0, 1, true, false].includes(newAccount.imap_secure)) {
+    newErrors.imap_secure = "IMAP secure must be true or false";
+  }
+
+  if (![0, 1, true, false].includes(newAccount.smtp_secure)) {
+    newErrors.smtp_secure = "SMTP secure must be true or false";
+  }
+
+  setErrors(newErrors);
+
+  return Object.keys(newErrors).length === 0;
+};
+
+  const [addProvider] = useAddProviderMutation();
+  const handleAddPoolAccount = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    if (!validateAccountForm()) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await addProvider(newAccount).unwrap();
+      toast.success("Account added to warmup pool successfully!");
+      setNewAccount({} as any);
       setAddDialogOpen(false);
-      setNewAccount({
-        email_address: "",
-        provider: "gmail",
-        smtp_host: "",
-        smtp_port: 587,
-        smtp_username: "",
-        smtp_password: "",
-        imap_host: "",
-        imap_port: 993,
-        imap_username: "",
-        imap_password: "",
-      });
-      //fetchPoolAccounts();
+    } catch (err) {
+      console.error("Unexpected error adding pool account:", err);
+      toast.error("An unexpected error occurred while adding account.");
     }
   };
 
@@ -245,21 +316,21 @@ const AdminWarmups = () => {
           imap_pass,
         ] = line.split(",");
         return {
-          email_address: email?.trim(),
+          email: email?.trim(),
           provider: provider?.trim() || "other",
           smtp_host: smtp_host?.trim(),
           smtp_port: smtp_port?.trim() ? parseInt(smtp_port.trim()) : null,
-          smtp_username: smtp_user?.trim(),
-          smtp_password: smtp_pass?.trim(),
+          smtp_user: smtp_user?.trim(),
+          smtp_pass: smtp_pass?.trim(),
           imap_host: imap_host?.trim(),
           imap_port: imap_port?.trim() ? parseInt(imap_port.trim()) : null,
-          imap_username: imap_user?.trim(),
-          imap_password: imap_pass?.trim(),
+          imap_user: imap_user?.trim(),
+          imap_pass: imap_pass?.trim(),
         };
       })
-      .filter((acc) => acc.email_address);
+      .filter((acc) => acc.email);
 
-    const { error } = await supabase.from("warmup_pool").insert(accounts);
+    //const { error } = await supabase.from("warmup_pool").insert(accounts);
 
     if (error) {
       toast.error("Error uploading accounts");
@@ -281,7 +352,7 @@ const AdminWarmups = () => {
 
     if (!confirm(`Delete ${selectedRows.length} selected accounts?`)) return;
 
-     await bulkDeleteWarmupEmail(selectedRows).unwrap();
+    await bulkDeleteWarmupEmail(selectedRows).unwrap();
 
     if (error) {
       toast.error("Error deleting accounts");
@@ -303,8 +374,6 @@ const AdminWarmups = () => {
       toast.error("Failed to delete email!");
     }
   };
-
-
 
   const handleReassignWarmup = async () => {
     if (!selectedWarmup || !selectedUserId) return;
@@ -432,7 +501,7 @@ const AdminWarmups = () => {
     const confirmation = prompt(
       `⚠️ DANGER: This will permanently delete ALL ${warmups.length} user warmup accounts.\n\nType "DELETE ALL WARMUPS" to confirm:`
     );
-    
+
     if (confirmation !== "DELETE ALL WARMUPS") {
       if (confirmation !== null) {
         toast.error("Deletion cancelled - confirmation text did not match");
@@ -441,15 +510,17 @@ const AdminWarmups = () => {
     }
 
     const { error } = await supabase
-      .from('warmup_accounts')
+      .from("warmup_accounts")
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+      .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
 
     if (error) {
       toast.error("Error deleting all warmup accounts");
       console.error(error);
     } else {
-      toast.success(`All ${warmups.length} warmup accounts deleted successfully`);
+      toast.success(
+        `All ${warmups.length} warmup accounts deleted successfully`
+      );
       fetchWarmups();
     }
   };
@@ -458,7 +529,7 @@ const AdminWarmups = () => {
     const confirmation = prompt(
       `⚠️ DANGER: This will permanently delete ALL ${poolAccounts.length} warmup pool accounts.\n\nType "DELETE ALL POOL" to confirm:`
     );
-    
+
     if (confirmation !== "DELETE ALL POOL") {
       if (confirmation !== null) {
         toast.error("Deletion cancelled - confirmation text did not match");
@@ -467,15 +538,17 @@ const AdminWarmups = () => {
     }
 
     const { error } = await supabase
-      .from('warmup_pool')
+      .from("warmup_pool")
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+      .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
 
     if (error) {
       toast.error("Error deleting all pool accounts");
       console.error(error);
     } else {
-      toast.success(`All ${poolAccounts.length} pool accounts deleted successfully`);
+      toast.success(
+        `All ${poolAccounts.length} pool accounts deleted successfully`
+      );
       setSelectedRows([]);
       fetchPoolAccounts();
     }
@@ -577,8 +650,12 @@ const AdminWarmups = () => {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
-                     {poolAccounts.length > 0 && (
-                      <Button variant="destructive" size="sm" onClick={handleDeleteAllPoolAccounts}>
+                    {poolAccounts.length > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDeleteAllPoolAccounts}
+                      >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete All Pool
                       </Button>
@@ -631,15 +708,20 @@ const AdminWarmups = () => {
                             <div>
                               <Label>Email Address</Label>
                               <Input
-                                value={newAccount.email_address}
+                                value={newAccount.email}
                                 onChange={(e) =>
                                   setNewAccount({
                                     ...newAccount,
-                                    email_address: e.target.value,
+                                    email: e.target.value,
                                   })
                                 }
                                 placeholder="email@example.com"
                               />
+                              {errors.email && (
+                            <p className="text-red-500 text-sm">
+                              {errors.email}
+                            </p>
+                          )}
                             </div>
                             <div>
                               <Label>Provider</Label>
@@ -662,6 +744,11 @@ const AdminWarmups = () => {
                                   <SelectItem value="other">Other</SelectItem>
                                 </SelectContent>
                               </Select>
+                               {errors.provider && (
+                            <p className="text-red-500 text-sm">
+                              {errors.provider}
+                            </p>
+                          )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
@@ -676,6 +763,11 @@ const AdminWarmups = () => {
                                   })
                                 }
                               />
+                                  {errors.smtp_host && (
+                            <p className="text-red-500 text-sm">
+                              {errors.smtp_host}
+                            </p>
+                          )}
                             </div>
                             <div>
                               <Label>SMTP Port</Label>
@@ -689,33 +781,48 @@ const AdminWarmups = () => {
                                   })
                                 }
                               />
+                                  {errors.smtp_port && (
+                            <p className="text-red-500 text-sm">
+                              {errors.smtp_port}
+                            </p>
+                          )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <Label>SMTP Username</Label>
                               <Input
-                                value={newAccount.smtp_username}
+                                value={newAccount.smtp_user}
                                 onChange={(e) =>
                                   setNewAccount({
                                     ...newAccount,
-                                    smtp_username: e.target.value,
+                                    smtp_user: e.target.value,
                                   })
                                 }
                               />
+                                    {errors.smtp_user && (
+                            <p className="text-red-500 text-sm">
+                              {errors.smtp_user}
+                            </p>
+                          )}
                             </div>
                             <div>
                               <Label>SMTP Password</Label>
                               <Input
                                 type="password"
-                                value={newAccount.smtp_password}
+                                value={newAccount.smtp_pass}
                                 onChange={(e) =>
                                   setNewAccount({
                                     ...newAccount,
-                                    smtp_password: e.target.value,
+                                    smtp_pass: e.target.value,
                                   })
                                 }
                               />
+                               {errors.smtp_pass && (
+                            <p className="text-red-500 text-sm">
+                              {errors.smtp_pass}
+                            </p>
+                          )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
@@ -730,6 +837,11 @@ const AdminWarmups = () => {
                                   })
                                 }
                               />
+                               {errors.imap_host && (
+                            <p className="text-red-500 text-sm">
+                              {errors.imap_host}
+                            </p>
+                          )}
                             </div>
                             <div>
                               <Label>IMAP Port</Label>
@@ -743,33 +855,48 @@ const AdminWarmups = () => {
                                   })
                                 }
                               />
+                               {errors.imap_port && (
+                            <p className="text-red-500 text-sm">
+                              {errors.imap_port}
+                            </p>
+                          )}
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <Label>IMAP Username</Label>
                               <Input
-                                value={newAccount.imap_username}
+                                value={newAccount.imap_user}
                                 onChange={(e) =>
                                   setNewAccount({
                                     ...newAccount,
-                                    imap_username: e.target.value,
+                                    imap_user: e.target.value,
                                   })
                                 }
                               />
+                               {errors.imap_user && (
+                            <p className="text-red-500 text-sm">
+                              {errors.imap_user}
+                            </p>
+                          )}
                             </div>
                             <div>
                               <Label>IMAP Password</Label>
                               <Input
                                 type="password"
-                                value={newAccount.imap_password}
+                                value={newAccount.imap_pass}
                                 onChange={(e) =>
                                   setNewAccount({
                                     ...newAccount,
-                                    imap_password: e.target.value,
+                                    imap_pass: e.target.value,
                                   })
                                 }
                               />
+                                {errors.imap_pass && (
+                            <p className="text-red-500 text-sm">
+                              {errors.imap_pass }
+                            </p>
+                          )}
                             </div>
                           </div>
                         </div>
@@ -845,7 +972,7 @@ const AdminWarmups = () => {
                               />
                             </TableCell>
                             <TableCell className="font-medium">
-                              {account.smtp_username}
+                              {account.smtp_user}
                             </TableCell>
                             <TableCell className="capitalize">
                               {account.email_provider}
@@ -996,22 +1123,26 @@ const AdminWarmups = () => {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
-                  {paginatedWarmups?.length > 0 && (
-                        <Button variant="destructive" size="sm" onClick={handleDeleteAllWarmups}>
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete All Warmups
-                        </Button>
-                      )}
-                  {selectedWarmupRows.length > 0 && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleBulkDeleteWarmups}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Selected ({selectedWarmupRows.length})
-                    </Button>
-                  )}
+                    {paginatedWarmups?.length > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDeleteAllWarmups}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete All Warmups
+                      </Button>
+                    )}
+                    {selectedWarmupRows.length > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBulkDeleteWarmups}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Selected ({selectedWarmupRows.length})
+                      </Button>
+                    )}
                   </div>
                   <Button
                     variant="outline"
@@ -1090,7 +1221,7 @@ const AdminWarmups = () => {
                               />
                             </TableCell>
                             <TableCell className="font-medium">
-                              {warmup?.smtp_username || "—"}
+                              {warmup?.smtp_user || "—"}
                             </TableCell>
                             <TableCell>
                               {warmup.first_name + "  " + warmup?.last_name ||

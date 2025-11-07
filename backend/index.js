@@ -6,6 +6,7 @@ const app = express();
 const cors = require('cors');
 const path = require("path");
 const fs = require("fs");
+const  {startSchedulers } =  require('./scheduler.js');
 
 
 
@@ -68,4 +69,10 @@ app.use('/api', userRoutes);
 
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+//app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`Server running on ${PORT}`);
+  //startSchedulers();
+});
+

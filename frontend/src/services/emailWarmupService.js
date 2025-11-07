@@ -76,6 +76,19 @@ export const emailWarmupService = apiSlice.injectEndpoints({
         };
       },
     }),
+
+    addProvider: builder.mutation({
+  query: (body) => ({
+    url: "/add_provider",
+    method: "POST",
+    body,
+  }),
+  invalidatesTags: ["ProviderAccounts"],
+}),
+
+
+
+
   }),
   overrideExisting: false,
 });
@@ -88,5 +101,6 @@ export const {
   useExportWarmupCsvMutation,
   useFetchEmailProviderCountsQuery,
   useSaveEmailNewMutation,
-  useExportEmailAccountsCsvMutation
+  useExportEmailAccountsCsvMutation,
+  useAddProviderMutation
 } = emailWarmupService;
