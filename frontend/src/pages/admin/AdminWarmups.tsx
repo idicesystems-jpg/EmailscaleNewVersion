@@ -65,6 +65,7 @@ import {
   useAddSmtpAccountMutation,
   useGetAllSmtpAccountsQuery,
   useGetProvidersQuery,
+  useGetWarmupLogsQuery 
 } from "../../services/emailWarmupService";
 import { useImpersonation } from "@/hooks/useImpersonation";
 
@@ -90,9 +91,12 @@ const AdminWarmups = () => {
 
   const { data: providers } = useGetProvidersQuery({ page, limit, search });
 
-  //console.log("providers:", providers);
 
-  const [warmupLogs, setWarmupLogs] = useState<any[]>([]);
+  const { data:warmupLogs } = useGetWarmupLogsQuery();
+
+  console.log("warmuplogs", warmupLogs?.data);
+
+  //const [warmupLogs, setWarmupLogs] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [inboxes, setInboxes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -159,7 +163,7 @@ const AdminWarmups = () => {
     //fetchWarmups();
     //fetchPoolAccounts();
     fetchUsers();
-    fetchWarmupLogs();
+    //fetchWarmupLogs();
     fetchInboxes();
   }, [impersonatedUserId]);
 
@@ -189,22 +193,22 @@ const AdminWarmups = () => {
     }
   };
 
-  const fetchWarmupLogs = async () => {
-    setLogsLoading(true);
-    const { data, error } = await supabase
-      .from("warmup_logs")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(1000);
+  // const fetchWarmupLogs = async () => {
+  //   setLogsLoading(true);
+  //   const { data, error } = await supabase
+  //     .from("warmup_logs")
+  //     .select("*")
+  //     .order("created_at", { ascending: false })
+  //     .limit(1000);
 
-    if (error) {
-      toast.error("Error fetching warmup logs");
-      console.error(error);
-    } else {
-      setWarmupLogs(data || []);
-    }
-    setLogsLoading(false);
-  };
+  //   if (error) {
+  //     toast.error("Error fetching warmup logs");
+  //     console.error(error);
+  //   } else {
+  //     setWarmupLogs(data || []);
+  //   }
+  //   setLogsLoading(false);
+  // };
 
   const handleToggleStatus = async (
     warmupId: string,
@@ -527,22 +531,22 @@ const AdminWarmups = () => {
     currentPage * itemsPerPage
   );
 
-  const logsTotalPages = Math.ceil(warmupLogs.length / itemsPerPage);
-  const paginatedLogs = warmupLogs.slice(
+  const logsTotalPages = Math.ceil(warmupLogs?.data.length / itemsPerPage);
+  const paginatedLogs = warmupLogs?.data.slice(
     (logsCurrentPage - 1) * itemsPerPage,
     logsCurrentPage * itemsPerPage
   );
 
   // Analytics calculations
-  const totalSent = warmupLogs.filter(
+  const totalSent = warmupLogs?.data.filter(
     (l) => l.status === "sent" || l.received_at
   ).length;
-  const totalReceived = warmupLogs.filter((l) => l.received_at).length;
-  const totalReplied = warmupLogs.filter((l) => l.replied_at).length;
+  const totalReceived = warmupLogs?.data.filter((l) => l.received_at).length;
+  const totalReplied = warmupLogs?.data.filter((l) => l.replied_at).length;
   const inboxRate =
     totalReceived > 0
       ? (
-          (warmupLogs.filter((l) => l.landed_in === "inbox").length /
+          (warmupLogs?.data.filter((l) => l.landed_in === "inbox").length /
             totalReceived) *
           100
         ).toFixed(1)
@@ -1758,18 +1762,19 @@ const AdminWarmups = () => {
                   <div>
                     <CardTitle>Warmup Activity Logs</CardTitle>
                     <CardDescription>
-                      Detailed email warmup tracking ({warmupLogs.length} total
+                      Detailed email warmup tracking ({warmupLogs?.data.length} total
                       logs)
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {logsLoading ? (
+                {/* {logsLoading ? (
                   <div className="flex justify-center p-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                ) : warmupLogs.length === 0 ? (
+                ) :  */}
+                {warmupLogs?.data.length === 0 ? (
                   <p className="text-center text-muted-foreground p-8">
                     No warmup logs yet
                   </p>
@@ -1789,7 +1794,7 @@ const AdminWarmups = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {paginatedLogs.map((log) => (
+                        {paginatedLogs?.map((log) => (
                           <TableRow key={log.id}>
                             <TableCell>
                               <span
@@ -1828,22 +1833,22 @@ const AdminWarmups = () => {
                                 : "—"}
                             </TableCell>
                             <TableCell className="text-xs">
-                              {log.replied_at
-                                ? new Date(log.replied_at).toLocaleString()
+                              {log.reply_at
+                                ? new Date(log.reply_at).toLocaleString()
                                 : "—"}
                             </TableCell>
                             <TableCell>
-                              {log.landed_in ? (
+                              {log.mailbox ? (
                                 <span
                                   className={`px-2 py-1 rounded text-xs font-medium ${
-                                    log.landed_in === "inbox"
+                                    log.mailbox === "inbox"
                                       ? "bg-green-500/20 text-green-500"
-                                      : log.landed_in === "spam"
+                                      : log.mailbox === "spam"
                                       ? "bg-red-500/20 text-red-500"
                                       : "bg-gray-500/20 text-gray-500"
                                   }`}
                                 >
-                                  {log.landed_in}
+                                  {log.mailbox}
                                 </span>
                               ) : (
                                 "—"
@@ -1860,9 +1865,9 @@ const AdminWarmups = () => {
                           Showing {(logsCurrentPage - 1) * itemsPerPage + 1} to{" "}
                           {Math.min(
                             logsCurrentPage * itemsPerPage,
-                            warmupLogs.length
+                            warmupLogs?.data.length
                           )}{" "}
-                          of {warmupLogs.length} logs
+                          of {warmupLogs?.data.length} logs
                         </div>
                         <div className="flex gap-2">
                           <Button

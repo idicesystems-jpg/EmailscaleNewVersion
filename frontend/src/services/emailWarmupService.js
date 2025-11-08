@@ -116,6 +116,14 @@ export const emailWarmupService = apiSlice.injectEndpoints({
       providesTags: ["Providers"],
     }),
 
+    getWarmupLogs: builder.query({
+      query: () => ({
+        url: "warmup-logs",
+        method: "GET",
+      }),
+      providesTags: ["WarmupLogs"],
+    }),
+
 
   }),
   overrideExisting: false,
@@ -133,5 +141,6 @@ export const {
   useAddProviderMutation,
   useAddSmtpAccountMutation,
   useGetAllSmtpAccountsQuery,
-  useGetProvidersQuery
+  useGetProvidersQuery,
+  useGetWarmupLogsQuery 
 } = emailWarmupService;

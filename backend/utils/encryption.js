@@ -24,6 +24,7 @@ function encrypt(text) {
   return iv.toString('base64') + ':' + encrypted;
 }
 
+
 // --- Decrypt function ---
 function decrypt(enc) {
   if (!enc) return '';
