@@ -95,7 +95,7 @@ export const emailWarmupService = apiSlice.injectEndpoints({
     }),
 
     getAllSmtpAccounts: builder.query({
-       query: (params) => {
+      query: (params) => {
         const queryParams = new URLSearchParams();
         if (params?.page) queryParams.append("page", params.page);
         if (params?.limit) queryParams.append("limit", params.limit);
@@ -104,6 +104,19 @@ export const emailWarmupService = apiSlice.injectEndpoints({
       },
       providesTags: ["SmtpAccounts"],
     }),
+
+    getProviders: builder.query({
+      query: (params) => {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.append("page", params.page);
+        if (params?.limit) queryParams.append("limit", params.limit);
+        if (params?.search) queryParams.append("search", params.search);
+        return `providers?${queryParams.toString()}`;
+      },
+      providesTags: ["Providers"],
+    }),
+
+
   }),
   overrideExisting: false,
 });
@@ -120,4 +133,5 @@ export const {
   useAddProviderMutation,
   useAddSmtpAccountMutation,
   useGetAllSmtpAccountsQuery,
+  useGetProvidersQuery
 } = emailWarmupService;
