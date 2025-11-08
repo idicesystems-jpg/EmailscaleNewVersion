@@ -63,7 +63,8 @@ import {
   useDeleteEmailAccountsMutation,
   useAddProviderMutation,
   useAddSmtpAccountMutation,
-  useGetAllSmtpAccountsQuery
+  useGetAllSmtpAccountsQuery,
+  useGetProvidersQuery,
 } from "../../services/emailWarmupService";
 import { useImpersonation } from "@/hooks/useImpersonation";
 
@@ -81,11 +82,15 @@ const AdminWarmups = () => {
   //   search,
   // });
 
-  const { data, isLoading} = useGetAllSmtpAccountsQuery({page,
-     limit,
-     search,});
+  const { data, isLoading } = useGetAllSmtpAccountsQuery({
+    page,
+    limit,
+    search,
+  });
 
-  console.log("Warmup data fetched:", data);
+  const { data: providers } = useGetProvidersQuery({ page, limit, search });
+
+  //console.log("providers:", providers);
 
   const [warmupLogs, setWarmupLogs] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -104,10 +109,10 @@ const AdminWarmups = () => {
   // const poolAccounts = data?.data?.campaigns || [];
   // const warmups = data?.data?.campaigns || [];
 
-  const poolAccounts = data?.data || [];
+  const poolAccounts = providers?.data || [];
   const warmups = data?.data || [];
 
-  console.log("poolAccounts",poolAccounts);
+  //console.log("poolAccounts", poolAccounts);
 
   const [saveEmailNew] = useSaveEmailNewMutation();
 
@@ -1064,22 +1069,22 @@ const AdminWarmups = () => {
                               />
                             </TableCell>
                             <TableCell className="font-medium">
-                              {account.smtp_user}
+                              {account.email}
                             </TableCell>
                             <TableCell className="capitalize">
-                              {account.email_provider}
+                              {account.provider}
                             </TableCell>
                             <TableCell>
                               <span
                                 className={`px-2 py-1 rounded text-xs ${
-                                  account.warmup_enabled === "TRUE"
+                                  account.enabled === "true"
                                     ? "bg-green-500/20 text-green-500"
-                                    : account.warmup_enabled === "FALSE"
+                                    : account.enabled === "false"
                                     ? "bg-gray-500/20 text-gray-500"
                                     : "bg-red-500/20 text-red-500"
                                 }`}
                               >
-                                {account.warmup_enabled ? "Active" : "Inactive"}
+                                {account.enabled ? "Active" : "Inactive"}
                               </span>
                             </TableCell>
                             <TableCell>{account.daily_volume}</TableCell>
@@ -1111,7 +1116,7 @@ const AdminWarmups = () => {
                       page={page}
                       setPage={setPage}
                       limit={limit}
-                      total={data?.data?.total}
+                      total={providers?.pagination?.totalRecords}
                     />
                   </>
                 )}
@@ -1381,7 +1386,7 @@ const AdminWarmups = () => {
                               </p>
                             )}
                           </div>
-                           <div>
+                          <div>
                             <Label>Daily Limit</Label>
                             <Input
                               type="number"
@@ -1486,13 +1491,11 @@ const AdminWarmups = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {
-                loading ? (
+                {loading ? (
                   <div className="flex justify-center p-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                ) : 
-                warmups.length === 0 ? (
+                ) : warmups.length === 0 ? (
                   <p className="text-center text-muted-foreground p-8">
                     No user warmup accounts found
                   </p>
@@ -1556,10 +1559,7 @@ const AdminWarmups = () => {
                             <TableCell className="font-medium">
                               {warmup?.from_email || "—"}
                             </TableCell>
-                            <TableCell>
-                              {warmup.from_name ||
-                                "—"}
-                            </TableCell>
+                            <TableCell>{warmup.from_name || "—"}</TableCell>
                             <TableCell>
                               <span
                                 className={`px-2 py-1 rounded text-xs ${
@@ -1587,7 +1587,9 @@ const AdminWarmups = () => {
                             <TableCell>{warmup.daily_limit}</TableCell>
                             <TableCell>{warmup.sent_today}</TableCell>
                             <TableCell>
-                              {new Date(warmup.sent_today_date).toLocaleDateString()}
+                              {new Date(
+                                warmup.sent_today_date
+                              ).toLocaleDateString()}
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
