@@ -602,22 +602,61 @@ const getWarmupLogs = async (req, res) => {
       : {};
 
     // 🔹 Fetch data
+    // const { count, rows } = await WarmupLog.findAndCountAll({
+    //   where: whereCondition,
+    //   attributes: {
+    //     include: [
+    //       [sequelize.col("smtp_account.label"), "smtp_label"],
+    //       [sequelize.col("provider_account.email"), "provider_email"],
+    //     ],
+    //   },
+    //   include: [
+    //     { model: SmtpAccount, as: "smtp_account", attributes: [], required: false },
+    //     { model: ProviderAccount, as: "provider_account", attributes: [], required: false },
+    //   ],
+    //   order: [["id", "DESC"]],
+    //   limit,
+    //   offset,
+    //   raw: true, // flatten data
+    // });
     const { count, rows } = await WarmupLog.findAndCountAll({
       where: whereCondition,
-      attributes: {
-        include: [
-          [sequelize.col("smtp_account.label"), "smtp_label"],
-          [sequelize.col("provider_account.email"), "provider_email"],
-        ],
-      },
+      attributes: [
+        "id",
+        "token",
+        "subject",
+        "from_smtp_id",
+        "to_provider_id",
+        "message_id",
+        "status",
+        "spam_folder",
+        "mailbox",
+        "error",
+        "sent_at",
+        "received_at",
+        "reply_at",
+        // 👇 include parent table emails
+        [sequelize.col("smtp_account.from_email"), "smtp_from_email"],
+        [sequelize.col("provider_account.email"), "provider_email"],
+      ],
       include: [
-        { model: SmtpAccount, as: "smtp_account", attributes: [], required: false },
-        { model: ProviderAccount, as: "provider_account", attributes: [], required: false },
+        {
+          model: SmtpAccount,
+          as: "smtp_account",
+          attributes: [], // no need to pull all columns
+          required: false,
+        },
+        {
+          model: ProviderAccount,
+          as: "provider_account",
+          attributes: [],
+          required: false,
+        },
       ],
       order: [["id", "DESC"]],
       limit,
       offset,
-      raw: true, // flatten data
+      raw: true, // flatten results
     });
 
     const totalPages = Math.ceil(count / limit);
