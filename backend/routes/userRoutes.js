@@ -50,6 +50,7 @@ const {
   bulkDeleteWarmupEmail,
   exportEmailAccounts,
   exportWarmupCsv,
+  getWarmupLogs
 } = require("../controllers/emailWarmupController");
 
 const {
@@ -168,6 +169,7 @@ router.delete("/email-warmup/:id", deleteWarmupEmail);
 router.post("/bulk-delete-warmup-email", bulkDeleteWarmupEmail);
 router.get("/export-email-accounts", exportEmailAccounts);
 router.get("/export-email-warmup-csv", exportWarmupCsv);
+router.get('/warmup-logs', getWarmupLogs);
 
 //EmailAccounts routes.
 router.post("/save-email-new", saveEmailNew);
