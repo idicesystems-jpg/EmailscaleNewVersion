@@ -63,6 +63,7 @@ import {
   useDeleteEmailAccountsMutation,
   useAddProviderMutation,
   useAddSmtpAccountMutation,
+  useGetAllSmtpAccountsQuery
 } from "../../services/emailWarmupService";
 import { useImpersonation } from "@/hooks/useImpersonation";
 
@@ -74,11 +75,15 @@ const AdminWarmups = () => {
   const [search, setSearch] = useState("");
 
   //fetch users code
-  const { data, error, isLoading } = useFetchEmailWarmupQuery({
-    page,
-    limit,
-    search,
-  });
+  // const { data, error, isLoading } = useFetchEmailWarmupQuery({
+  //   page,
+  //   limit,
+  //   search,
+  // });
+
+  const { data, isLoading} = useGetAllSmtpAccountsQuery({page,
+     limit,
+     search,});
 
   console.log("Warmup data fetched:", data);
 
@@ -96,8 +101,13 @@ const AdminWarmups = () => {
   const [selectedWarmup, setSelectedWarmup] = useState<any>(null);
   const [selectedUserId, setSelectedUserId] = useState("");
 
-  const poolAccounts = data?.data?.campaigns || [];
-  const warmups = data?.data?.campaigns || [];
+  // const poolAccounts = data?.data?.campaigns || [];
+  // const warmups = data?.data?.campaigns || [];
+
+  const poolAccounts = data?.data || [];
+  const warmups = data?.data || [];
+
+  console.log("poolAccounts",poolAccounts);
 
   const [saveEmailNew] = useSaveEmailNewMutation();
 
@@ -1476,11 +1486,13 @@ const AdminWarmups = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {loading ? (
+                {
+                loading ? (
                   <div className="flex justify-center p-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                ) : warmups.length === 0 ? (
+                ) : 
+                warmups.length === 0 ? (
                   <p className="text-center text-muted-foreground p-8">
                     No user warmup accounts found
                   </p>
@@ -1542,23 +1554,23 @@ const AdminWarmups = () => {
                               />
                             </TableCell>
                             <TableCell className="font-medium">
-                              {warmup?.smtp_user || "—"}
+                              {warmup?.from_email || "—"}
                             </TableCell>
                             <TableCell>
-                              {warmup.first_name + "  " + warmup?.last_name ||
+                              {warmup.from_name ||
                                 "—"}
                             </TableCell>
                             <TableCell>
                               <span
                                 className={`px-2 py-1 rounded text-xs ${
-                                  warmup.warmup_status === "TRUE"
+                                  warmup.enabled === "true"
                                     ? "bg-green-500/20 text-green-500"
-                                    : warmup.warmup_status === "FALSE"
+                                    : warmup.enabled === "false"
                                     ? "bg-orange-500/20 text-orange-500"
                                     : "bg-blue-500/20 text-blue-500"
                                 }`}
                               >
-                                {warmup.warmup_enabled ? "Active" : "Paused"}
+                                {warmup.enabled ? "Active" : "Paused"}
                               </span>
                             </TableCell>
                             <TableCell>
@@ -1573,9 +1585,9 @@ const AdminWarmups = () => {
                               </div>
                             </TableCell>
                             <TableCell>{warmup.daily_limit}</TableCell>
-                            <TableCell>{warmup.current_daily_sent}</TableCell>
+                            <TableCell>{warmup.sent_today}</TableCell>
                             <TableCell>
-                              {new Date(warmup.created_at).toLocaleDateString()}
+                              {new Date(warmup.sent_today_date).toLocaleDateString()}
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
@@ -1624,7 +1636,7 @@ const AdminWarmups = () => {
                       page={page}
                       setPage={setPage}
                       limit={limit}
-                      total={data?.data?.total}
+                      total={data?.pagination?.totalRecords}
                     />
 
                     {/* {totalPages > 1 && (
