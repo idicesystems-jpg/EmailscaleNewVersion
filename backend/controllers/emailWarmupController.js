@@ -532,7 +532,7 @@ const getWarmupLogs0 = async (req, res) => {
   }
 };
 
-const getWarmupLogs = async (req, res) => {
+const getWarmupLogs1 = async (req, res) => {
   try {
     const logs = await WarmupLog.findAll({
       attributes: {
@@ -564,6 +564,74 @@ const getWarmupLogs = async (req, res) => {
       status:true,
       message:"Data Fetched Successfully",
       data: logs
+    });
+  } catch (error) {
+    console.error("Error fetching warmup logs:", error);
+    res.status(500).json({
+      status: false,
+      message: "Server error while fetching warmup logs",
+      error: error.message,
+    });
+  }
+};
+
+const getWarmupLogs = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search ? req.query.search.trim() : "";
+    const offset = (page - 1) * limit;
+
+    // 🔍 Build search condition
+    const whereCondition = search
+      ? {
+          [Op.or]: [
+            { token: { [Op.like]: `%${search}%` } },
+            { subject: { [Op.like]: `%${search}%` } },
+            { mailbox: { [Op.like]: `%${search}%` } },
+            sequelize.where(
+              sequelize.col("smtp_account.label"),
+              { [Op.like]: `%${search}%` }
+            ),
+            sequelize.where(
+              sequelize.col("provider_account.email"),
+              { [Op.like]: `%${search}%` }
+            ),
+          ],
+        }
+      : {};
+
+    // 🔹 Fetch data
+    const { count, rows } = await WarmupLog.findAndCountAll({
+      where: whereCondition,
+      attributes: {
+        include: [
+          [sequelize.col("smtp_account.label"), "smtp_label"],
+          [sequelize.col("provider_account.email"), "provider_email"],
+        ],
+      },
+      include: [
+        { model: SmtpAccount, as: "smtp_account", attributes: [], required: false },
+        { model: ProviderAccount, as: "provider_account", attributes: [], required: false },
+      ],
+      order: [["id", "DESC"]],
+      limit,
+      offset,
+      raw: true, // flatten data
+    });
+
+    const totalPages = Math.ceil(count / limit);
+
+    res.status(200).json({
+      status: true,
+      message: "Warmup logs fetched successfully",
+      data: rows,
+      pagination: {
+        totalRecords: count,
+        totalPages,
+        currentPage: page,
+        pageSize: limit,
+      },
     });
   } catch (error) {
     console.error("Error fetching warmup logs:", error);
