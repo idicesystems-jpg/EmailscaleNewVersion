@@ -3,6 +3,7 @@ const User = require("../models/User");
 const SmtpAccount = require("../models/SmtpAccount");
 const bcrypt = require("bcrypt");
 const { Op } = require("sequelize");
+const { encrypt } = require('../utils/encryption');
 
 const getAllSmtps = async (req, res) => {
   try {
@@ -72,8 +73,8 @@ const createSmtp = async (req, res) => {
 
     // Encrypt password before saving
     // const enc = bcrypt(b.smtp_pass);
-    const saltRounds = 10; // or whatever you prefer
-    const enc = await bcrypt.hash(b.smtp_pass, saltRounds);
+    //const saltRounds = 10; // or whatever you prefer
+    //const enc = await bcrypt.hash(b.smtp_pass, saltRounds);
 
     // Insert into database
     const newSmtp = await SmtpAccount.create({
@@ -84,7 +85,7 @@ const createSmtp = async (req, res) => {
       smtp_port: b.smtp_port || 465,
       smtp_secure: b.smtp_secure ? 1 : 0,
       smtp_user: b.smtp_user || b.from_email,
-      smtp_pass: enc,
+      smtp_pass: encrypt(b.smtp_pass),
       daily_limit: b.daily_limit || 40,
       enabled: b.enabled ? 1 : 1,
     });
