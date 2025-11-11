@@ -1817,10 +1817,10 @@ const AdminWarmups = () => {
                               {log.subject || "—"}
                             </TableCell>
                             <TableCell className="font-mono text-xs">
-                              {log.from_email}
+                              {log.smtp_from_email}
                             </TableCell>
                             <TableCell className="font-mono text-xs">
-                              {log.to_email}
+                              {log.provider_email}
                             </TableCell>
                             <TableCell className="text-xs">
                               {log.sent_at
