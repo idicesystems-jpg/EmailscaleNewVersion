@@ -9,8 +9,8 @@ const dayjs = require("dayjs");
 const fs = require("fs");
 const csv = require("csv-parser");
 const { Parser } = require("json2csv");
-const NamecheapService = require("../services/namecheapService");
-const namecheapService = new NamecheapService();
+const namecheapService  = require("../services/namecheapService");
+// const namecheapService = new NamecheapService();
 
 const saveDomainAndUser = async (req, res) => {
   try {
@@ -739,6 +739,7 @@ const checkAlternateDomainAvailability = async (req, res) => {
     }
 
     // Call Namecheap service
+    // const result = await namecheapService.searchAlternateDomains(domainName, count);
     const result = await namecheapService.searchAlternateDomains(domainName, count);
     res.json(result);
 
@@ -747,30 +748,55 @@ const checkAlternateDomainAvailability = async (req, res) => {
     res.status(500).json({ error: err.message || 'Something went wrong' });
   }
 };
+
+
+// const checkDomainAvailability = async (req, res) => {
+//   try {
+//     // Get domains from request body (like Laravel's $request->input('result'))
+//     const domains = req.body.result;
+
+//     if (!domains || domains.length === 0) {
+//       return res
+//         .status(400)
+//         .json({ status: false, message: "result field is required" });
+//     }
+
+//     // Call the Namecheap service
+//     // const result = await namecheapService.searchDomains(domains);
+//     const result = await namecheapService.searchAlternateDomains(
+//       domain_name,
+//       count
+//     );
+//     // Return the result as JSON
+//     return res.json(result);
+//   } catch (error) {
+//     console.error("Error checking domain availability:", error);
+//     return res.status(500).json({ status: false, message: error.message });
+//   }
+// };
 const checkDomainAvailability = async (req, res) => {
   try {
-    // Get domains from request body (like Laravel's $request->input('result'))
-    const domains = req.body.result;
-
-    if (!domains || domains.length === 0) {
-      return res
-        .status(400)
-        .json({ status: false, message: "result field is required" });
+    const domains = req.body.result; // expecting array of domains
+    if (!domains || !Array.isArray(domains) || domains.length === 0) {
+      return res.status(400).json({ status: false, message: "result field must be a non-empty array" });
     }
 
-    // Call the Namecheap service
-    // const result = await namecheapService.searchDomains(domains);
-    const result = await NamecheapService.searchAlternateDomains(
-      domain_name,
-      count
-    );
-    // Return the result as JSON
+    const result = await namecheapService.searchDomains(domains);
     return res.json(result);
   } catch (error) {
     console.error("Error checking domain availability:", error);
     return res.status(500).json({ status: false, message: error.message });
   }
 };
+const axios = require("axios");
+
+async function getPublicIP() {
+  const res = await axios.get("https://api.ipify.org?format=json");
+  console.log("Your current public IP:", res.data.ip);
+}
+
+getPublicIP();
+
 
 module.exports = {
   saveDomainAndUser,
