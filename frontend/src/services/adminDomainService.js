@@ -5,9 +5,7 @@ export const adminDomainService = apiSlice.injectEndpoints({
     // Fetch all domains
     fetchDomains: builder.query({
       // params: { page?: number, limit?: number, search?: string }
-      query: (
-        params = {}
-      ) => {
+      query: (params = {}) => {
         const queryParams = new URLSearchParams();
 
         if (params.page) queryParams.append("page", params.page.toString());
@@ -85,6 +83,15 @@ export const adminDomainService = apiSlice.injectEndpoints({
         url: `domains/${id}/status`,
         method: "PUT",
         body: { status },
+      }),
+      invalidatesTags: ["Domains"],
+    }),
+
+    checkAlternateDomainAvailability: builder.mutation({
+      query: (payload) => ({
+        url: "checkAlternateDomainAvailability",
+        method: "POST",
+        body: payload,
       }),
       invalidatesTags: ["Domains"],
     }),
