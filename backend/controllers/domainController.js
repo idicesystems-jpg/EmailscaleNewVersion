@@ -9,7 +9,9 @@ const dayjs = require("dayjs");
 const fs = require("fs");
 const csv = require("csv-parser");
 const { Parser } = require("json2csv");
-const namecheapService  = require("../services/namecheapService");
+// const axios = require("axios");
+
+const namecheapService = require("../services/namecheapService");
 // const namecheapService = new NamecheapService();
 
 const saveDomainAndUser = async (req, res) => {
@@ -683,14 +685,12 @@ const exportDomainsCsv = async (req, res) => {
   }
 };
 
-
 const checkAlternateDomainAvailability1 = async (req, res) => {
   try {
-
     const { domain_name, domain_type, count = 1 } = req.body;
 
     if (!domain_name) {
-      return res.status(400).json({ error: 'Domain name is required' });
+      return res.status(400).json({ error: "Domain name is required" });
     }
 
     // Construct domain name with type if present
@@ -701,12 +701,14 @@ const checkAlternateDomainAvailability1 = async (req, res) => {
 
     // Call Namecheap service
     // const result = await namecheapService.searchAlternateDomains(domainName, count);
-    const result = await namecheapService.searchAlternateDomains(domainName, count);
+    const result = await namecheapService.searchAlternateDomains(
+      domainName,
+      count
+    );
     res.json(result);
-
   } catch (err) {
-    console.error('Error in checkAlternateDomainAvailability:', err);
-    res.status(500).json({ error: err.message || 'Something went wrong' });
+    console.error("Error in checkAlternateDomainAvailability:", err);
+    res.status(500).json({ error: err.message || "Something went wrong" });
   }
 };
 
@@ -719,93 +721,41 @@ const checkAlternateDomainAvailability2 = async (req, res) => {
     }
 
     // Build domain list for multiple extensions
-    const extensions = domain_type ? domain_type.split(',') : ['.com'];
-    const domainList = extensions.map(ext => `${domain_name}${ext}`).join(',');
+    const extensions = domain_type ? domain_type.split(",") : [".com"];
+    const domainList = extensions
+      .map((ext) => `${domain_name}${ext}`)
+      .join(",");
 
     // Construct Namecheap API URL
     const url = `https://api.namecheap.com/xml.response?ApiUser=${process.env.NAMECHEAP_API_USER}&ApiKey=${process.env.NAMECHEAP_API_KEY}&UserName=${process.env.NAMECHEAP_USERNAME}&ClientIp=${process.env.NAMECHEAP_CLIENT_IP}&Command=namecheap.domains.check&DomainList=${domainList}`;
 
     // Fetch data from Namecheap
     const { data } = await axios.get(url);
-    const parsed = await xml2js.parseStringPromise(data, { explicitArray: false });
+    const parsed = await xml2js.parseStringPromise(data, {
+      explicitArray: false,
+    });
 
     // Extract the domain data
     const response = parsed.ApiResponse.CommandResponse.DomainCheckResult;
     const domains = Array.isArray(response) ? response : [response];
 
     // Format output with pricing info
-    const results = domains.map(item => ({
+    const results = domains.map((item) => ({
       domain: item.$.Domain,
-      available: item.$.Available === 'true',
-      isPremium: item.$.IsPremiumName === 'true',
+      available: item.$.Available === "true",
+      isPremium: item.$.IsPremiumName === "true",
       prices: {
         registration: parseFloat(item.$.PremiumRegistrationPrice || 0),
         renewal: parseFloat(item.$.PremiumRenewalPrice || 0),
         transfer: parseFloat(item.$.PremiumTransferPrice || 0),
-        icannFee: parseFloat(item.$.IcannFee || 0)
-      }
+        icannFee: parseFloat(item.$.IcannFee || 0),
+      },
     }));
 
     return res.status(200).json({
       success: true,
-      results
+      results,
     });
-
-  } catch (error) {
-    console.error("Error in checkAlternateDomainAvailability:", error.message);
-    return res.status(500).json({
-      success: false,
-      error: error.message || "Something went wrong while checking domains"
-    });
-  }
-};
-
-const checkAlternateDomainAvailability = async (req, res) => {
-  try {
-    const { domain_name, domain_type } = req.body;
-    if (!domain_name) {
-      return res.status(400).json({ error: "Domain name is required" });
-    }
-
-    const extensions = domain_type ? domain_type.split(',') : ['.com'];
-    const domainList = extensions.map(ext => `${domain_name}${ext}`).join(',');
-
-    // 1️ Check domain availability
-    const checkUrl = `https://api.namecheap.com/xml.response?ApiUser=${process.env.NAMECHEAP_API_USER}&ApiKey=${process.env.NAMECHEAP_API_KEY}&UserName=${process.env.NAMECHEAP_USERNAME}&ClientIp=${process.env.NAMECHEAP_CLIENT_IP}&Command=namecheap.domains.check&DomainList=${domainList}`;
-    const { data: checkData } = await axios.get(checkUrl);
-    const parsedCheck = await xml2js.parseStringPromise(checkData, { explicitArray: false });
-
-    const domains = Array.isArray(parsedCheck.ApiResponse.CommandResponse.DomainCheckResult)
-      ? parsedCheck.ApiResponse.CommandResponse.DomainCheckResult
-      : [parsedCheck.ApiResponse.CommandResponse.DomainCheckResult];
-
-    // 2️ Fetch pricing for all extensions
-    const pricingResults = {};
-    for (const ext of extensions) {
-      const cleanExt = ext.replace('.', '');
-      const priceUrl = `https://api.namecheap.com/xml.response?ApiUser=${process.env.NAMECHEAP_API_USER}&ApiKey=${process.env.NAMECHEAP_API_KEY}&UserName=${process.env.NAMECHEAP_USERNAME}&ClientIp=${process.env.NAMECHEAP_CLIENT_IP}&Command=namecheap.users.getPricing&ProductType=DOMAIN&ProductCategory=REGISTER&ProductName=${cleanExt}`;
-      const { data: priceData } = await axios.get(priceUrl);
-      const parsedPrice = await xml2js.parseStringPromise(priceData, { explicitArray: false });
-      const price = parsedPrice.ApiResponse.CommandResponse.UserGetPricingResult.Product.Price;
-      pricingResults[ext] = {
-        registration: parseFloat(price.$.Price),
-        currency: price.$.Currency,
-      };
-    }
-
-    // 3 Combine both availability + pricing
-    const results = domains.map(item => {
-      const ext = `.${item.$.Domain.split('.').pop()}`;
-      return {
-        domain: item.$.Domain,
-        available: item.$.Available === 'true',
-        isPremium: item.$.IsPremiumName === 'true',
-        price: pricingResults[ext] || {},
-      };
-    });
-
-    return res.status(200).json({ success: true, results });
-
   } catch (error) {
     console.error("Error in checkAlternateDomainAvailability:", error.message);
     return res.status(500).json({
@@ -814,7 +764,93 @@ const checkAlternateDomainAvailability = async (req, res) => {
     });
   }
 };
+const xml2js = require("xml2js");
+const checkAlternateDomainAvailability = async (req, res) => {
+  try {
+    const { domain_name, domain_type } = req.body;
+    if (!domain_name) {
+      return res.status(400).json({ error: "Domain name is required" });
+    }
 
+    const extensions = domain_type ? domain_type.split(",") : [".com"];
+    const domainList = extensions
+      .map((ext) => `${domain_name}${ext}`)
+      .join(",");
+
+    // 1️ Check domain availability
+    const checkUrl = `https://api.namecheap.com/xml.response?ApiUser=${process.env.NAMECHEAP_API_USER}&ApiKey=${process.env.NAMECHEAP_API_KEY}&UserName=${process.env.NAMECHEAP_USERNAME}&ClientIp=${process.env.NAMECHEAP_CLIENT_IP}&Command=namecheap.domains.check&DomainList=${domainList}`;
+    const { data: checkData } = await axios.get(checkUrl);
+    const parsedCheck = await xml2js.parseStringPromise(checkData, {
+      explicitArray: false,
+    });
+
+    const domains = Array.isArray(
+      parsedCheck.ApiResponse.CommandResponse.DomainCheckResult
+    )
+      ? parsedCheck.ApiResponse.CommandResponse.DomainCheckResult
+      : [parsedCheck.ApiResponse.CommandResponse.DomainCheckResult];
+
+    // 2️ Fetch pricing for all extensions
+    // const pricingResults = {};
+    // for (const ext of extensions) {
+    //   const cleanExt = ext.replace('.', '');
+    //   const priceUrl = `https://api.namecheap.com/xml.response?ApiUser=${process.env.NAMECHEAP_API_USER}&ApiKey=${process.env.NAMECHEAP_API_KEY}&UserName=${process.env.NAMECHEAP_USERNAME}&ClientIp=${process.env.NAMECHEAP_CLIENT_IP}&Command=namecheap.users.getPricing&ProductType=DOMAIN&ProductCategory=REGISTER&ProductName=${cleanExt}`;
+    //   const { data: priceData } = await axios.get(priceUrl);
+    //   const parsedPrice = await xml2js.parseStringPromise(priceData, { explicitArray: false });
+    //   const price = parsedPrice.ApiResponse.CommandResponse.UserGetPricingResult.Product.Price;
+    //   pricingResults[ext] = {
+    //     registration: parseFloat(price.$.Price),
+    //     currency: price.$.Currency,
+    //   };
+    // }
+
+    const pricingResults = {};
+    for (const ext of extensions) {
+      const cleanExt = ext.replace(/^\./, "").toLowerCase();
+
+      const priceUrl = `https://api.namecheap.com/xml.response?ApiUser=${process.env.NAMECHEAP_API_USER}&ApiKey=${process.env.NAMECHEAP_API_KEY}&UserName=${process.env.NAMECHEAP_USERNAME}&ClientIp=${process.env.NAMECHEAP_CLIENT_IP}&Command=namecheap.users.getPricing&ProductType=DOMAIN&ProductCategory=REGISTER&ProductName=${cleanExt}`;
+
+      const { data: priceData } = await axios.get(priceUrl);
+      const parsedPrice = await xml2js.parseStringPromise(priceData, {
+        explicitArray: false,
+      });
+
+      const product =
+        parsedPrice?.ApiResponse?.CommandResponse?.UserGetPricingResult
+          ?.Product;
+
+      if (!product || !product.Price) {
+        pricingResults[ext] = { registration: null, currency: null };
+        continue;
+      }
+
+      const price = product.Price;
+      pricingResults[ext] = {
+        registration: parseFloat(price.$.Price),
+        currency: price.$.Currency,
+      };
+    }
+
+    // 3 Combine both availability + pricing
+    const results = domains.map((item) => {
+      const ext = `.${item.$.Domain.split(".").pop()}`;
+      return {
+        domain: item.$.Domain,
+        available: item.$.Available === "true",
+        isPremium: item.$.IsPremiumName === "true",
+        price: pricingResults[ext] || {},
+      };
+    });
+
+    return res.status(200).json({ success: true, results });
+  } catch (error) {
+    console.error("Error in checkAlternateDomainAvailability:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Something went wrong while checking domains",
+    });
+  }
+};
 
 // const checkDomainAvailability = async (req, res) => {
 //   try {
@@ -844,7 +880,12 @@ const checkDomainAvailability = async (req, res) => {
   try {
     const domains = req.body.result; // expecting array of domains
     if (!domains || !Array.isArray(domains) || domains.length === 0) {
-      return res.status(400).json({ status: false, message: "result field must be a non-empty array" });
+      return res
+        .status(400)
+        .json({
+          status: false,
+          message: "result field must be a non-empty array",
+        });
     }
 
     const result = await namecheapService.searchDomains(domains);
@@ -862,7 +903,6 @@ async function getPublicIP() {
 }
 
 getPublicIP();
-
 
 module.exports = {
   saveDomainAndUser,
