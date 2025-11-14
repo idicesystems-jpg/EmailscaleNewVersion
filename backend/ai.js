@@ -133,6 +133,9 @@ const BODY_STYLES = [
 
 async function ollamaGenerate(prompt) {
   try {
+    console.log(`[AI] Using model: ${MODEL}`);
+    console.log(`[AI] Prompt sample:`, prompt.slice(0, 120).trim() + (prompt.length > 120 ? '...' : ''));
+    
     const { data } = await axios.post(
       `${OLLAMA_URL}/api/generate`,
       { model: MODEL, prompt, stream: false },
