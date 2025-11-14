@@ -50,6 +50,11 @@ async function callNamecheapApi(command, params = {}) {
     NAMECHEAP_CLIENT_IP = currentIP;
   }
 
+  // if (NAMECHEAP_CLIENT_IP !== currentIP) {
+  //   console.warn(`[NamecheapService] Warning: .env IP (${NAMECHEAP_CLIENT_IP}) differs from current IP (${currentIP})`);
+  //   NAMECHEAP_CLIENT_IP = currentIP; // auto-update
+  // }
+
   const queryParams = {
     ApiUser: NAMECHEAP_API_USER,
     ApiKey: NAMECHEAP_API_KEY,

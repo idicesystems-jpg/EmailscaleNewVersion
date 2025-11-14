@@ -533,7 +533,7 @@ const exportCsv = async (req, res) => {
 };
 
 const updateUserProfile = async (req, res) => {
-  console.log("this profile function is calling");
+  // console.log("this profile function is calling");
   try {
     await Promise.all([
       body('id').notEmpty().withMessage('id is required').run(req),
