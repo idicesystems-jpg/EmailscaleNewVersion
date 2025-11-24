@@ -5,6 +5,8 @@ const Domain = require("../models/Domain");
 const Transaction = require("../models/Transaction");
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+
+//create payment intent
 const createPaymentIntent = async (req, res) => {
   try {
     const {
