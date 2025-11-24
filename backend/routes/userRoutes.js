@@ -6,6 +6,9 @@ const router = express.Router();
 const authenticateToken = require("../middlewares/authMiddleware");
 const impersonationMiddleware  = require("../middlewares/impersonationMiddleware");
 const {
+  createPaymentIntent
+} = require("../controllers/stripePaymentController");
+const {
   login,
   logout,
   register,
@@ -234,5 +237,5 @@ router.post('/admin-note-replies', addNoteAdminReply);
 router.delete('/delete-notes/:id', deleteNoteWithReplies);
 router.put('/reassign-note/:id', reassignNote);
 router.delete('/delete-note-reply/:id', deleteNoteReply);
-
+router.post("/create-payment-intent", createPaymentIntent);
 module.exports = router;

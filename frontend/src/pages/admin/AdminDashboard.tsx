@@ -233,7 +233,7 @@ const AdminDashboard = () => {
       .select("id, full_name, email")
       .order("email", { ascending: true });
 
-    setAllUsers(data || []);
+    //setAllUsers(data || []);
   };
 
   const fetchTickets = async () => {
@@ -388,7 +388,7 @@ const AdminDashboard = () => {
       );
 
     console.log("Admin users fetched:", admins);
-    setAdminUsers(admins);
+    //setAdminUsers(admins);
   };
 
   const fetchAdminNotes = async () => {

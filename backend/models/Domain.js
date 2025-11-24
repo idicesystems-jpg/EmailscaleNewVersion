@@ -83,6 +83,10 @@ const Domain = sequelize.define('Domain', {
         type: DataTypes.DATEONLY,
         allowNull: true
     },
+    domain_emails: {
+      type: DataTypes.TEXT("long"),
+      allowNull: true,
+    },
     created_at: {
         type: DataTypes.DATE,
         allowNull: false,

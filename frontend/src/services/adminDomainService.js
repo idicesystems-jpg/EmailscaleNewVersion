@@ -95,6 +95,17 @@ export const adminDomainService = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Domains"],
     }),
+
+    createPaymentIntent: builder.mutation({
+      query: (payload) => ({
+        url: "create-payment-intent",
+        method: "POST",
+        body: payload,
+      }),
+      invalidatesTags: ["Payment"],
+    }),
+
+
   }),
   overrideExisting: false,
 });
@@ -107,4 +118,6 @@ export const {
   useUpdateDomainStatusMutation,
   useLazyExportDomainsCsvQuery,
   useImportDomainsMutation,
+  useCheckAlternateDomainAvailabilityMutation,
+  useCreatePaymentIntentMutation
 } = adminDomainService;

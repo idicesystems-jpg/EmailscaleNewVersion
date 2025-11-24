@@ -6,24 +6,19 @@
 
 const crypto = require('crypto');
 
-// --- Configuration ---
-const IV_LEN = 16; // AES block size
-// Create a 32-byte encryption key (pads or trims .env key safely)
-const ENC_KEY = (process.env.ENCRYPTION_KEY || 'default_secret_key_1234567890')
-  .padEnd(32, '0')
-  .slice(0, 32);
+const ENC_KEY = (process.env.ENCRYPTION_KEY || '').padEnd(32, '0').slice(0, 32); // 32 bytes
+const IV_LEN = 16;
+  
 
 // --- Encrypt function ---
 function encrypt(text) {
   if (!text) return '';
-  const iv = crypto.randomBytes(IV_LEN); // unique IV per encryption
+  const iv = crypto.randomBytes(IV_LEN);
   const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENC_KEY), iv);
   let encrypted = cipher.update(text, 'utf8', 'base64');
   encrypted += cipher.final('base64');
-  // Return IV and encrypted data separated by ':'
   return iv.toString('base64') + ':' + encrypted;
 }
-
 
 // --- Decrypt function ---
 function decrypt(enc) {

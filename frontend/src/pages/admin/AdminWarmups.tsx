@@ -314,7 +314,7 @@ const AdminWarmups = () => {
   const [addProvider] = useAddProviderMutation();
   const handleAddPoolAccount = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    //setLoading(true);
 
     if (!validateAccountForm()) {
       setLoading(false);
@@ -381,7 +381,7 @@ const AdminWarmups = () => {
 
   const handleAddSmtpAccount = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    //setLoading(true);
 
     if (!smtpValidateAccountForm()) {
       setLoading(false);
@@ -496,7 +496,7 @@ const AdminWarmups = () => {
   };
 
   const handleBulkDeleteWarmups = async () => {
-    alert("check");
+    //alert("check");
     if (selectedWarmupRows.length === 0) {
       toast.error("No warmup accounts selected");
       return;
@@ -622,7 +622,7 @@ const AdminWarmups = () => {
       toast.success(
         `All ${warmups.length} warmup accounts deleted successfully`
       );
-      fetchWarmups();
+      //fetchWarmups();
     }
   };
 
@@ -651,7 +651,7 @@ const AdminWarmups = () => {
         `All ${poolAccounts.length} pool accounts deleted successfully`
       );
       setSelectedRows([]);
-      fetchPoolAccounts();
+      //fetchPoolAccounts();
     }
   };
 

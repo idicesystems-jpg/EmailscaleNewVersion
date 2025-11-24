@@ -90,6 +90,7 @@ const SPAM_BOXES = ['[Gmail]/Spam','Spam','Junk','Bulk Mail','Bulk','[Yahoo]/Bul
   console.log('[imap] scan complete');
 }
 
+
 async function scanImapAccount(acc) {
   console.log(`[imap] connecting ${acc.email} (${acc.imap_host}:${acc.imap_port})`);
   const client = await imapConnect(acc);

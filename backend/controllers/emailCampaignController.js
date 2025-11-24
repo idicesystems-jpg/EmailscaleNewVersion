@@ -1184,35 +1184,39 @@ const addProvider = async (req, res) => {
 
     const errors = [];
 
-    // 🔐 Encrypt passwords for DB
+    // Encrypt passwords for DB
     const imapPassEnc = encrypt(b.imap_pass || "");
     const smtpPassEnc = b.smtp_pass ? encrypt(b.smtp_pass) : null;
 
-    // ✅ Verify IMAP
+    // Verify IMAP
     let imapOk = true;
     try {
       imapOk = await verifyImap({
         host: b.imap_host,
         port: b.imap_port || 993,
-        secure: !!b.imap_secure,
+        //secure: !!b.imap_secure,
+        secure: b.imap_port == 993 ? 1 : 0,
         user: b.imap_user || b.email,
         pass: b.imap_pass,
       });
+
+      
     } catch (e) {
       errors.push(`IMAP error: ${String(e.message || e)}`);
     }
 
-    // ✅ Verify SMTP if provided
+    // Verify SMTP if provided
     let smtpOk = true;
     if (b.smtp_host && b.smtp_user && b.smtp_pass) {
       try {
         smtpOk = await verifySmtp({
           host: b.smtp_host,
           port: b.smtp_port || 465,
-          secure: !!b.smtp_secure,
+          secure: b.smtp_port == 465 ? 1 : 0,
           user: b.smtp_user,
           pass: b.smtp_pass,
         });
+       
       } catch (e) {
         smtpOk = false;
         errors.push(`SMTP error: ${String(e.message || e)}`);
@@ -1230,12 +1234,12 @@ const addProvider = async (req, res) => {
       provider: b.provider || "other",
       imap_host: b.imap_host,
       imap_port: b.imap_port || 993,
-      imap_secure: b.imap_secure ? 1 : 0,
+      imap_secure: b.imap_port == 993 ? 1 : 0,  
       imap_user: b.imap_user || b.email,
       imap_pass: imapPassEnc,
       smtp_host: b.smtp_host || null,
       smtp_port: b.smtp_port || 465,
-      smtp_secure: b.smtp_secure ? 1 : 0,
+      smtp_secure: b.smtp_port == 465 ? 1 : 0,
       smtp_user: b.smtp_user || b.email,
       smtp_pass: smtpPassEnc,
       enabled: b.enabled ? 1 : 1,

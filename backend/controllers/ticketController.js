@@ -150,9 +150,9 @@ async function syncTicketToGHL(
     let contactId = await getGHLContactIdByEmail(userEmail);
 
     if (!contactId) {
-      console.log("⚠️ Contact not found in GHL. Creating...");
+      //console.log("⚠️ Contact not found in GHL. Creating...");
       contactId = await createGHLContact(userEmail);
-      console.log("✅ Contact created with ID:", contactId);
+      //console.log("✅ Contact created with ID:", contactId);
     }
 
     const ticket = await createTicketInGHL(
@@ -192,7 +192,7 @@ async function removeTicketFromGHL(userEmail, ticketId) {
 
     let updatedTags = [...existingTags];
 
-    console.log("Existing Tags before removal:", existingTags);
+    //console.log("Existing Tags before removal:", existingTags);
 
     // Step 2: Filter out the ticket tag you want to remove
     const tagToRemove = `ticket #${ticketId}`.toLowerCase();
@@ -212,7 +212,7 @@ async function removeTicketFromGHL(userEmail, ticketId) {
       );
     }
 
-    console.log("Updated Tags after removal:", updatedTags);
+    //console.log("Updated Tags after removal:", updatedTags);
 
     // Step 3: Update contact with the new tag list
     const updateResp = await fetch(

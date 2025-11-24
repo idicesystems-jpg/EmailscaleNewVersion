@@ -83,7 +83,7 @@ const createSmtp = async (req, res) => {
       from_email: b.from_email,
       smtp_host: b.smtp_host,
       smtp_port: b.smtp_port || 465,
-      smtp_secure: b.smtp_secure ? 1 : 0,
+      smtp_secure: b.smtp_port == 465 ? 1 : 0,
       smtp_user: b.smtp_user || b.from_email,
       smtp_pass: encrypt(b.smtp_pass),
       daily_limit: b.daily_limit || 40,
