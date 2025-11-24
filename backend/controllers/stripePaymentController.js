@@ -41,11 +41,14 @@ const createPaymentIntent = async (req, res) => {
         state,
         country,
       };
+      await stripe.paymentMethods.attach(paymentMethodId, {
+        customer: customer.id,
+      });
 
-      await User.update(
-        { contact_details: JSON.stringify(contactDetails) },
-        { where: { id: user_id } }
-      );
+      // await User.update(
+      //   { contact_details: JSON.stringify(contactDetails) },
+      //   { where: { id: user_id } }
+      // );
     }
 
     // ------------------------------------------------------
