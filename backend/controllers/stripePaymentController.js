@@ -75,10 +75,14 @@ const createPaymentIntent = async (req, res) => {
     });
 
     // 2) Set payment method as default for the customer
-    await stripe.customers.update(customer.id, {
-      invoice_settings: {
-        default_payment_method: paymentMethodId,
-      },
+    // await stripe.customers.update(customer.id, {
+    //   invoice_settings: {
+    //     default_payment_method: paymentMethodId,
+    //   },
+    // });
+
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: customer.id,
     });
 
     // 2️ Create PaymentIntent

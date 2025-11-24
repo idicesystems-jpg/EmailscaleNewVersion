@@ -35,9 +35,9 @@ import {
 
 const InboxOrdering = () => {
   const { user, token, isAuthenticated } = useSelector(
-      (state: any) => state.auth
-    );
-  console.log("user",user);
+    (state: any) => state.auth
+  );
+  console.log("user", user);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -986,18 +986,38 @@ const InboxOrdering = () => {
       lname:lastName,
       email:user?.email,
       organization:"Test Company",
-      address1:"",
-      address2:"",
-      postal_code:"",
-      city:"",
-      state:"",
+      address1:"123 Street",
+      address2:"Suite 4",
+      postal_code:"W1A 1AA",
+      city:"London",
+      state:"London",
       country:"IN",
       user_id:user?.id,
-      amount: Math.round(totalPrice * 100), 
+      amount: Math.round(totalPrice * 100),
+      paymentMethodId: "pm_card_visa",
       result: fullSelectedDomains,
-      allamout: domainPrices.map((x) => Math.round(x * 100)), 
+      allamout: domainPrices.map((x) => Math.round(x * 100)),
       domainEmails: domainEmails,
     };
+
+    // const payload = {
+    //   save_contact_details: true,
+    //   fname: "John",
+    //   lname: "Doe",
+    //   email: "john@test.com",
+    //   organization: "Test Company",
+    //   address1: "123 Street",
+    //   address2: "Suite 4",
+    //   postal_code: "W1A 1AA",
+    //   city: "London",
+    //   state: "London",
+    //   country: "GB",
+    //   user_id: 1,
+    //   amount: 1000,
+    //   paymentMethodId: "pm_card_visa",
+    //   result: ["example.com", "mydomain.co"],
+    //   allamout: [500, 500],
+    // };
 
     console.log("Creating payment intent with payload:", payload);
 
